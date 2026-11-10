@@ -9,6 +9,8 @@ Strict TypeScript, vanilla DOM UI, esbuild, Vitest. No network calls, frameworks
 - CSS Engine Developer: `src/css/**` and `tests/css.test.ts` only. Export `generateDeclarations(node: InspectorNode): CSSDeclaration[]` and `generateCSS(node: InspectorNode): string` from `src/css/generate.ts`. Declarations contain `property`, `value`, and complete `declaration` with semicolon. Both full CSS and individual property copying must use this source. No Figma imports or globals.
 - UI Developer: `src/ui/**` only. `index.html` references `style.css` and `index.ts`; build inlines both. UI receives `PluginMessage`, sends `UIMessage`, uses DOM textContent for all design data.
 
+Presentation preferences use `src/shared/sections.ts` and native details controlled by `src/ui/sections.ts`. The host persists section snapshots in a dedicated clientStorage key, separate from window dimensions. Keep controller nodes alive during selection updates and suppress saves for programmatic restores. Spacing UI shows six geometry values; original dimensions and all calculations remain in the data model and Properties.
+
 ## Spacing Inspector ownership and geometry
 
 - Geometry Agent: `src/adapter/spacing.ts` captures Figma transforms/parent geometry; `src/geometry/**` computes distances without Figma API imports.

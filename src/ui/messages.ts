@@ -1,4 +1,6 @@
 import type { InspectorNode, InspectorState } from '../shared/contracts';
+import { parseSectionState } from '../shared/sections';
+import type { SectionState } from '../shared/sections';
 
 type ObjectValue = Record<string, unknown>;
 const object = (value: unknown): value is ObjectValue => typeof value === 'object' && value !== null && !Array.isArray(value);
@@ -9,9 +11,20 @@ const tuple = (value: unknown): boolean => Array.isArray(value) && value.length 
 const color = (value: unknown): boolean => object(value) && ['r', 'g', 'b', 'a'].every(key => finite(value[key]) && value[key] >= 0 && value[key] <= 1);
 const choice = (value: unknown, choices: string[]): boolean => typeof value === 'string' && choices.includes(value);
 
+export function parseResizeError(data: unknown): string | undefined {
+  if (!object(data) || !object(data.pluginMessage)) return undefined;
+  return data.pluginMessage.type === 'resize-error' && text(data.pluginMessage.message) ? data.pluginMessage.message : undefined;
+}
+
+export function parseSectionMessage(data: unknown): SectionState | undefined {
+  if (!object(data) || !object(data.pluginMessage) || data.pluginMessage.type !== 'section-state') return undefined;
+  return parseSectionState(data.pluginMessage.sections);
+}
+
 function node(value: unknown): value is InspectorNode {
   if (!object(value) || !text(value.id) || !text(value.name) || !text(value.type) || !Array.isArray(value.warnings) || !value.warnings.every(text)) return false;
   if (!['width', 'height', 'opacity'].every(key => optional(value[key], finite))) return false;
+  if (!optional(value.characters, text)) return false;
   if (!['backgroundColor', 'color'].every(key => optional(value[key], color))) return false;
   if (!optional(value.borderRadius, item => finite(item) || tuple(item))) return false;
   if (!optional(value.border, item => object(item) && finite(item.width) && color(item.color))) return false;

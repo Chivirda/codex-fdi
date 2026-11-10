@@ -20,36 +20,46 @@
       <div id="inspector" hidden>
         <section class="identity">
           <span id="node-type" class="badge"></span>
-          <h1 id="node-name"></h1>
+          <div class="identity-title"><h1 id="node-name"></h1><button id="copy-text" type="button" aria-label="Copy text content" hidden>Copy Text</button></div>
+          <p id="copy-text-status" class="text-copy-status" role="status" aria-live="polite"></p>
           <p>Properties from your current selection</p>
         </section>
-        <section aria-labelledby="properties-title">
-          <h2 id="properties-title">Properties</h2>
-          <dl id="properties" class="properties"></dl>
-        </section>
-        <section class="spacing-section" aria-labelledby="spacing-title">
-          <div class="section-heading"><h2 id="spacing-title">Spacing</h2><div class="spacing-units" role="group" aria-label="Spacing units"><button id="spacing-px" type="button" aria-pressed="true">px</button><button id="spacing-rem" type="button" aria-pressed="false">rem</button></div></div>
-          <label class="spacing-base-label" for="spacing-base">Base (px per rem)<input id="spacing-base" type="number" min="0.001" step="any" value="16" aria-describedby="spacing-base-error" /></label>
-          <p id="spacing-base-error" class="spacing-error" role="alert" hidden></p>
-          <p id="spacing-parent" class="spacing-parent"></p>
-          <p class="spacing-note">Bounds of the transformed layout rectangle in the parent’s axes. X/Y mark the minimum bounds; width/height are projected sizes and can differ from Properties when rotated. Strokes and visual contours are excluded.</p>
-          <p id="spacing-unsupported" class="spacing-note"></p>
-          <dl id="spacing-values" class="properties"></dl>
-          <ul id="spacing-warnings" class="spacing-warnings"></ul>
-        </section>
-        <section id="warnings-section" class="warnings" hidden aria-labelledby="warnings-title">
-          <h2 id="warnings-title">Not included in CSS</h2>
-          <ul id="warnings"></ul>
-        </section>
-        <section class="css-section" aria-labelledby="css-title">
-          <div class="section-heading"><h2 id="css-title">CSS</h2><button id="copy" type="button">Copy CSS</button></div>
-          <pre tabindex="0" aria-label="Generated CSS"><code id="css-code"></code></pre>
-          <p id="copy-status" class="copy-status" role="status" aria-live="polite"></p>
-        </section>
+        <div class="inspector-grid">
+          <details id="properties-section" class="inspector-panel" open>
+            <summary><h2 id="properties-title">Properties</h2></summary>
+            <div class="panel-body"><dl id="properties" class="properties"></dl></div>
+          </details>
+          <details id="spacing-section" class="inspector-panel spacing-section" open>
+            <summary><h2 id="spacing-title">Spacing</h2></summary>
+            <div class="panel-body">
+              <div class="spacing-toolbar"><p id="spacing-parent" class="spacing-parent"></p><div class="spacing-units" role="group" aria-label="Spacing units"><button id="spacing-px" type="button" aria-pressed="true">px</button><button id="spacing-rem" type="button" aria-pressed="false">rem</button></div></div>
+              <label id="spacing-base-settings" class="spacing-base-label" for="spacing-base">Base (px per rem)<input id="spacing-base" type="number" min="0.001" step="any" value="16" aria-describedby="spacing-base-error" /></label>
+              <p id="spacing-base-error" class="spacing-error" role="alert" hidden></p>
+              <p id="spacing-unsupported" class="spacing-note"></p>
+              <div id="spacing-values" class="properties spacing-diagram" role="group" aria-label="Parent spacing"></div>
+              <details class="spacing-info info-details">
+                <summary>About these measurements</summary>
+                <p class="spacing-note">Distances use the transformed layout rectangle in the parent’s axes. X/Y mark its minimum bounds; strokes and visual contours are excluded. The diagram is not to scale.</p>
+                <ul id="spacing-warnings" class="spacing-warnings"></ul>
+              </details>
+            </div>
+          </details>
+        </div>
+        <details id="css-section" class="inspector-panel css-section" open>
+          <summary><h2 id="css-title">CSS</h2></summary>
+          <div class="panel-body">
+            <div class="css-actions"><button id="copy" type="button">Copy CSS</button></div>
+            <pre tabindex="0" aria-label="Generated CSS"><code id="css-code"></code></pre>
+            <p id="copy-status" class="copy-status" role="status" aria-live="polite"></p>
+            <details id="warnings-section" class="warnings info-details" hidden>
+              <summary id="warnings-title">Not included in CSS</summary>
+              <ul id="warnings"></ul>
+            </details>
+          </div>
+        </details>
       </div>
     </main>
-    <footer>Local inspection · No data leaves Figma</footer>
-    <button id="resize-handle" type="button" aria-label="Resize inspector window" title="Drag to resize. Arrow keys resize by 10 px; Shift by 50 px."><span aria-hidden="true">◢</span></button>
+    <footer><span>Local inspection · No data leaves Figma</span><p id="resize-status" role="status" aria-live="polite"></p><button id="resize-handle" type="button" aria-label="Resize inspector window" title="Drag to resize. Arrow keys resize by 10 px; Shift by 50 px."><span aria-hidden="true">◢</span></button></footer>
     <script type="module" src="./index.ts"></script>
   </body>
 </html>

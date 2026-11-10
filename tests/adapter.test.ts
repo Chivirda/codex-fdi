@@ -8,6 +8,18 @@ const node = (properties: Record<string, unknown> = {}): SceneNode => ({
 const solid = { type: 'SOLID', color: { r: 1, g: 0.5, b: 0 }, opacity: 0.5 };
 
 describe('Figma adapter', () => {
+  it('preserves original multiline, whitespace and Unicode text exactly', () => {
+    const characters = '  Привет 👩🏽‍💻\n\t第二行 e\u0301  \n';
+    expect(normalizeNode(node({ type: 'TEXT', characters })).characters).toBe(characters);
+  });
+  it('preserves empty text as a present empty string', () => {
+    const actual = normalizeNode(node({ type: 'TEXT', characters: '' }));
+    expect(actual).toHaveProperty('characters', '');
+  });
+  it('does not expose characters on non-text nodes or coerce unavailable text', () => {
+    expect(normalizeNode(node({ characters: 'spoofed' }))).not.toHaveProperty('characters');
+    expect(normalizeNode(node({ type: 'TEXT', characters: Symbol('unavailable') }))).not.toHaveProperty('characters');
+  });
   it('normalizes dimensions, paint alpha, and uniform inside strokes', () => {
     const actual = normalizeNode(node({ fills: [solid], opacity: 0.8, strokes: [solid], strokeWeight: 2, strokeAlign: 'INSIDE' }));
     expect(actual.backgroundColor).toEqual({ r: 1, g: 0.5, b: 0, a: 0.5 });

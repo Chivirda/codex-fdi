@@ -88,6 +88,7 @@ export function normalizeNode(node: SceneNode): InspectorNode {
   } else if (source.layoutMode !== undefined && source.layoutMode !== 'NONE') warn('This layout mode is not supported.');
 
   if (node.type === 'TEXT') {
+    if (typeof source.characters === 'string') result.characters = source.characters;
     const typography: NonNullable<InspectorNode['typography']> = {};
     const font = fields(source.fontName);
     if (typeof font.family === 'string' && font.family.length) typography.fontFamily = font.family;

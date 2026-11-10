@@ -1,7 +1,7 @@
 import type { SpacingResult, SpacingKey } from '../shared/spacing';
 import { formatSpacingValue } from '../spacing/units';
 
-const keys: SpacingKey[] = ['top', 'right', 'bottom', 'left', 'x', 'y', 'width', 'height'];
+const keys: SpacingKey[] = ['top', 'right', 'bottom', 'left', 'x', 'y'];
 
 export function installSpacingInspector(get: <T extends HTMLElement>(id: string) => T, fallbackCopy: (text: string) => boolean): (spacing?: SpacingResult) => void {
   const rows = get('spacing-values');
@@ -12,7 +12,9 @@ export function installSpacingInspector(get: <T extends HTMLElement>(id: string)
   const pxButton = get<HTMLButtonElement>('spacing-px');
   const remButton = get<HTMLButtonElement>('spacing-rem');
   const baseInput = get<HTMLInputElement>('spacing-base');
-  baseInput.value = '16';
+  const baseSettings = get('spacing-base-settings');
+  rows.className = 'spacing-diagram';
+  baseInput.value = '10';
   let unit: 'px' | 'rem' = 'px';
   let current: SpacingResult | undefined;
   let version = 0;
@@ -23,6 +25,7 @@ export function installSpacingInspector(get: <T extends HTMLElement>(id: string)
     warningList.replaceChildren();
     pxButton.setAttribute('aria-pressed', String(unit === 'px'));
     remButton.setAttribute('aria-pressed', String(unit === 'rem'));
+    baseSettings.hidden = unit === 'px';
     const base = Number(baseInput.value);
     const invalidBase = unit === 'rem' && (!baseInput.value.trim() || !Number.isFinite(base) || base <= 0);
     const values = current?.status === 'ready' ? current.values : undefined;
@@ -44,10 +47,18 @@ export function installSpacingInspector(get: <T extends HTMLElement>(id: string)
       item.textContent = warning;
       warningList.append(item);
     }
+    const center = document.createElement('div');
+    center.className = 'spacing-center';
+    center.textContent = 'Selected';
+    center.setAttribute('aria-hidden', 'true');
+    const coordinates = document.createElement('div');
+    coordinates.className = 'spacing-coordinates';
+    coordinates.setAttribute('role', 'group');
+    coordinates.setAttribute('aria-label', 'Coordinates');
     for (const key of keys) {
       const value = invalid ? undefined : formatSpacingValue(current.values[key], unit, base);
-      const row = document.createElement('div');
-      row.className = 'property spacing-row';
+      const row = document.createElement('dl');
+      row.className = `spacing-cell spacing-${key}`;
       const label = document.createElement('dt');
       label.textContent = key[0]!.toUpperCase() + key.slice(1);
       const cell = document.createElement('dd');
@@ -103,8 +114,10 @@ export function installSpacingInspector(get: <T extends HTMLElement>(id: string)
       });
       cell.append(display, button, status);
       row.append(label, cell);
-      rows.append(row);
+      if (key === 'x' || key === 'y') coordinates.append(row);
+      else rows.append(row);
     }
+    rows.append(center, coordinates);
   };
   pxButton.addEventListener('click', () => { unit = 'px'; render(); });
   remButton.addEventListener('click', () => { unit = 'rem'; render(); });

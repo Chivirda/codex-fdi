@@ -1,4 +1,5 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import { WINDOW_LIMITS } from '../src/shared/window-size';
 
 vi.mock('../src/adapter/normalize', () => ({
   normalizeNode: () => ({ id: '1', name: 'Frame', type: 'FRAME', width: 120, height: 80, warnings: [] }),
@@ -61,11 +62,11 @@ describe('window resize and persistence', () => {
     const { host } = setup();
     await import('../src/main');
     host.ui.onmessage?.({ type: 'resize', width: 100, height: 5000, finished: true });
-    expect(host.ui.resize).toHaveBeenLastCalledWith(320, 1000);
+    expect(host.ui.resize).toHaveBeenLastCalledWith(320, WINDOW_LIMITS.maxHeight);
     await settle();
-    expect(host.clientStorage.setAsync).toHaveBeenCalledWith('design-inspector-window-size', { width: 320, height: 1000 });
+    expect(host.clientStorage.setAsync).toHaveBeenCalledWith('design-inspector-window-size', { width: 320, height: WINDOW_LIMITS.maxHeight });
     host.ui.onmessage?.({ type: 'resize', width: 5000, height: 10, finished: true });
-    expect(host.ui.resize).toHaveBeenLastCalledWith(900, 400);
+    expect(host.ui.resize).toHaveBeenLastCalledWith(900, 300);
   });
 
   it('debounces movement and cancels the pending save when drag ends', async () => {
@@ -124,7 +125,7 @@ describe('window resize and persistence', () => {
     const first = setup(Promise.resolve({ width: 10000, height: 0 }));
     await import('../src/main');
     await settle();
-    expect(first.host.ui.resize).toHaveBeenCalledWith(900, 400);
+    expect(first.host.ui.resize).toHaveBeenCalledWith(900, 300);
     vi.resetModules();
     let resolve: ((value: unknown) => void) | undefined;
     const second = setup(new Promise(value => { resolve = value; }));
@@ -147,6 +148,58 @@ describe('window resize and persistence', () => {
     expect(host.ui.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ state: expect.objectContaining({ status: 'ready' }) }));
   });
 
+  it('limits restored and requested dimensions to the available screen with window chrome space', async () => {
+    const { host } = setup(Promise.resolve({ width: 900, height: 1000 }));
+    await import('../src/main');
+    await settle();
+    host.ui.onmessage?.({ type: 'window-bounds', availableWidth: 800, availableHeight: 700 });
+    expect(host.ui.resize).toHaveBeenLastCalledWith(768, 604);
+    host.ui.onmessage?.({ type: 'resize', width: 10000, height: 10000, finished: true });
+    await settle();
+    expect(host.ui.resize).toHaveBeenLastCalledWith(768, 604);
+    expect(host.clientStorage.setAsync).toHaveBeenLastCalledWith('design-inspector-window-size', { width: 768, height: 604 });
+    // Switching to a very small screen cannot lower the explicit application minimum.
+    host.ui.onmessage?.({ type: 'window-bounds', availableWidth: 200, availableHeight: 200 });
+    expect(host.ui.resize).toHaveBeenLastCalledWith(320, 300);
+  });
+
+  it('clamps a delayed restored size after screen information arrives', async () => {
+    let restore: ((value: unknown) => void) | undefined;
+    const { host } = setup(new Promise(resolve => { restore = resolve; }));
+    await import('../src/main');
+    host.ui.onmessage?.({ type: 'window-bounds', availableWidth: 600, availableHeight: 600 });
+    restore?.({ width: 900, height: 1000 });
+    await settle();
+    expect(host.ui.resize).toHaveBeenLastCalledWith(568, 504);
+  });
+
+  it('reports Figma resize rejection without saving failed requests or breaking inspection', async () => {
+    const { host } = setup();
+    await import('../src/main');
+    host.ui.resize.mockImplementation(() => { throw new Error('Host rejected'); });
+    host.ui.onmessage?.({ type: 'resize', width: 800, height: 900, finished: true });
+    await settle();
+    expect(host.clientStorage.setAsync).not.toHaveBeenCalled();
+    expect(host.ui.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'resize-error', message: expect.stringContaining('Figma') }));
+    host.ui.onmessage?.({ type: 'refresh' });
+    expect(host.ui.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'inspector-state' }));
+    host.ui.resize.mockReset();
+    host.ui.onmessage?.({ type: 'resize', width: 500, height: 600, finished: true });
+    await settle();
+    expect(host.ui.postMessage).toHaveBeenLastCalledWith({ type: 'resize-error', message: '' });
+    expect(host.clientStorage.setAsync).toHaveBeenLastCalledWith('design-inspector-window-size', { width: 500, height: 600 });
+  });
+
+  it('ignores invalid screen dimensions', async () => {
+    const { host } = setup();
+    await import('../src/main');
+    for (const availableHeight of [NaN, Infinity, 0, -1, '600']) {
+      host.ui.onmessage?.({ type: 'window-bounds', availableWidth: 600, availableHeight });
+    }
+    host.ui.onmessage?.({ type: 'resize', width: 900, height: 1000, finished: true });
+    expect(host.ui.resize).toHaveBeenLastCalledWith(900, 1000);
+  });
+
   it('keeps resizing and inspection available if storage reads or writes fail', async () => {
     const { host } = setup(Promise.reject(new Error('Unavailable')));
     host.clientStorage.setAsync.mockRejectedValue(new Error('Quota'));
@@ -157,5 +210,54 @@ describe('window resize and persistence', () => {
     await settle();
     expect(host.ui.resize).toHaveBeenLastCalledWith(520, 720);
     expect(host.clientStorage.setAsync).toHaveBeenCalledTimes(2);
+  });
+});
+
+describe('section presentation preferences', () => {
+  const state = { properties: false, spacing: true, css: false };
+  it('restores all independent sections on UI handshake', async () => {
+    const { host } = setup(Promise.resolve(state));
+    await import('../src/main');
+    host.ui.onmessage?.({ type: 'sections-ready' });
+    await settle();
+    expect(host.ui.postMessage).toHaveBeenLastCalledWith({ type: 'section-state', sections: state });
+    expect(host.clientStorage.setAsync).not.toHaveBeenCalled();
+  });
+  it('persists a full validated snapshot and restores it on the next launch', async () => {
+    const first = setup();
+    await import('../src/main');
+    first.host.ui.onmessage?.({ type: 'set-sections', sections: state });
+    await settle();
+    expect(first.host.clientStorage.setAsync).toHaveBeenCalledWith('design-inspector-sections', state);
+    vi.resetModules();
+    const second = setup(Promise.resolve(first.host.clientStorage.setAsync.mock.calls[0]?.[1]));
+    await import('../src/main');
+    second.host.ui.onmessage?.({ type: 'sections-ready' });
+    await settle();
+    expect(second.host.ui.postMessage).toHaveBeenLastCalledWith({ type: 'section-state', sections: state });
+  });
+  it('does not undo a user toggle when the stored snapshot arrives late', async () => {
+    let resolve: ((value: unknown) => void) | undefined;
+    const { host } = setup(new Promise(done => { resolve = done; }));
+    await import('../src/main');
+    host.ui.onmessage?.({ type: 'sections-ready' });
+    host.ui.onmessage?.({ type: 'set-sections', sections: state });
+    resolve?.({ properties: true, spacing: false, css: true });
+    await settle();
+    expect(host.ui.postMessage).toHaveBeenLastCalledWith({ type: 'section-state', sections: state });
+  });
+  it('keeps defaults for invalid data and still inspects if preferences cannot be saved', async () => {
+    const { host } = setup(Promise.resolve({ properties: 'closed', spacing: true, css: true }));
+    host.clientStorage.setAsync.mockRejectedValue(new Error('Unavailable'));
+    await import('../src/main');
+    host.ui.onmessage?.({ type: 'set-sections', sections: { properties: false } });
+    host.ui.onmessage?.({ type: 'sections-ready' });
+    await settle();
+    expect(host.ui.postMessage).toHaveBeenLastCalledWith({ type: 'section-state', sections: { properties: true, spacing: true, css: true } });
+    expect(host.clientStorage.setAsync).not.toHaveBeenCalled();
+    host.ui.onmessage?.({ type: 'set-sections', sections: state });
+    await settle();
+    host.ui.onmessage?.({ type: 'refresh' });
+    expect(host.ui.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'inspector-state' }));
   });
 });

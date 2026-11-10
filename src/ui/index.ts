@@ -1,8 +1,9 @@
 import type { InspectorNode, InspectorState, RGBA, UIMessage } from '../shared/contracts';
-import { parseInspectorMessage } from './messages';
+import { parseInspectorMessage, parseResizeError, parseSectionMessage } from './messages';
 import { generateDeclarations } from '../css/generate';
 import { installWindowResize } from './resize';
 import { installSpacingInspector } from './spacing';
+import { installSections } from './sections';
 
 function element<T extends HTMLElement>(id: string): T {
   const result = document.getElementById(id);
@@ -14,10 +15,17 @@ const statePanel = element('state');
 const inspector = element('inspector');
 const copyButton = element<HTMLButtonElement>('copy');
 const copyStatus = element('copy-status');
+const textCopyButton = element<HTMLButtonElement>('copy-text');
+const textCopyStatus = element('copy-text-status');
+let selectionVersion = 0;
+let currentText: { id: string; text: string } | undefined;
+let pendingTextVersion: number | undefined;
+let textCopyAttempt = 0;
 let currentCSS = '';
 let copying = false;
 let loadingTimeout: ReturnType<typeof setTimeout> | undefined;
 const showSpacing = installSpacingInspector(element, text => fallbackCopy(text, null));
+const applySections = installSections(element, send);
 
 function send(message: UIMessage): void {
   parent.postMessage({ pluginMessage: message }, '*');
@@ -80,6 +88,12 @@ function showProperties(node: InspectorNode): void {
 }
 
 function render(state: InspectorState): void {
+  selectionVersion++;
+  currentText = undefined;
+  textCopyButton.hidden = true;
+  textCopyButton.disabled = false;
+  textCopyButton.textContent = 'Copy Text';
+  textCopyStatus.textContent = '';
   showSpacing(state.status === 'ready' ? state.node.spacing : undefined);
   clearTimeout(loadingTimeout);
   loadingTimeout = undefined;
@@ -94,6 +108,11 @@ function render(state: InspectorState): void {
   copyStatus.textContent = '';
   if (state.status === 'ready') {
     element('node-name').textContent = state.node.name;
+    element('node-name').title = state.node.name;
+    if (state.node.type === 'TEXT' && typeof state.node.characters === 'string') {
+      currentText = { id: state.node.id, text: state.node.characters };
+      textCopyButton.hidden = false;
+    }
     element('node-type').textContent = state.node.type.replace(/_/g, ' ');
     showProperties(state.node);
     currentCSS = state.css;
@@ -121,10 +140,10 @@ function render(state: InspectorState): void {
   element('state-description').textContent = description;
 }
 
-function fallbackCopy(text: string, focusTarget: HTMLElement | null = copyButton): boolean {
+function fallbackCopy(text: string, focusTarget: HTMLElement | null = copyButton, label = 'CSS to copy'): boolean {
   const textarea = document.createElement('textarea');
   textarea.value = text;
-  textarea.setAttribute('aria-label', 'CSS to copy');
+  textarea.setAttribute('aria-label', label);
   textarea.style.position = 'fixed';
   textarea.style.opacity = '0';
   document.body.append(textarea);
@@ -136,6 +155,63 @@ function fallbackCopy(text: string, focusTarget: HTMLElement | null = copyButton
     focusTarget?.focus();
   }
 }
+
+/** Textareas normalize line endings. Override the copy payload to retain original text exactly. */
+function fallbackCopyText(text: string): boolean {
+  let intercepted = false;
+  const onCopy = (event: ClipboardEvent): void => {
+    if (!event.clipboardData) return;
+    try {
+      event.clipboardData.setData('text/plain', text);
+      event.preventDefault();
+      intercepted = true;
+    } catch { /* An unverified copy must not be reported as successful. */ }
+  };
+  document.addEventListener('copy', onCopy);
+  try {
+    // A nonempty selection triggers the copy event even when the desired payload is empty.
+    return fallbackCopy(text || ' ', null, 'Text to copy') && intercepted;
+  } finally {
+    document.removeEventListener('copy', onCopy);
+  }
+}
+
+textCopyButton.addEventListener('click', () => {
+  const selected = currentText;
+  const version = selectionVersion;
+  if (!selected || pendingTextVersion === version) return;
+  const attempt = ++textCopyAttempt;
+  pendingTextVersion = version;
+  textCopyButton.disabled = true;
+  textCopyStatus.textContent = '';
+  const isCurrent = (): boolean => selectionVersion === version && currentText?.id === selected.id && textCopyAttempt === attempt;
+  const copy = async (): Promise<void> => {
+    let copied = false;
+    let usedFallback = false;
+    try {
+      if (!navigator.clipboard?.writeText) throw new Error('Clipboard API unavailable');
+      await navigator.clipboard.writeText(selected.text);
+      copied = true;
+    } catch {
+      if (!isCurrent()) return;
+      usedFallback = true;
+      try { copied = fallbackCopyText(selected.text); } catch { /* Show error below. */ }
+    } finally {
+      if (pendingTextVersion === version) pendingTextVersion = undefined;
+      if (isCurrent()) textCopyButton.disabled = false;
+    }
+    if (!isCurrent()) return;
+    if (usedFallback) textCopyButton.focus();
+    textCopyButton.textContent = copied ? 'Copied ✓' : 'Copy Text';
+    textCopyStatus.textContent = copied ? 'Text copied to clipboard.' : 'Copy unavailable. Try again or copy the text directly from the Figma text layer.';
+    if (copied) setTimeout(() => {
+      if (!isCurrent()) return;
+      textCopyButton.textContent = 'Copy Text';
+      textCopyStatus.textContent = '';
+    }, 1600);
+  };
+  void copy();
+});
 
 function addPropertyCopy(container: HTMLElement, property: string, declaration: string): void {
   const button = document.createElement('button');
@@ -218,6 +294,16 @@ element('refresh').addEventListener('click', () => {
 });
 
 window.addEventListener('message', (event: MessageEvent<unknown>) => {
+  const sections = parseSectionMessage(event.data);
+  if (sections) {
+    applySections(sections);
+    return;
+  }
+  const resizeError = parseResizeError(event.data);
+  if (resizeError !== undefined) {
+    element('resize-status').textContent = resizeError;
+    return;
+  }
   const state = parseInspectorMessage(event.data);
   if (state) render(state);
 });
