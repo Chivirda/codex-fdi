@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Design Inspector</title>
+    <link rel="stylesheet" href="./style.css" />
+  </head>
+  <body>
+    <header class="toolbar">
+      <div><span class="brand-mark" aria-hidden="true">⌘</span><strong>Design Inspector</strong></div>
+      <button id="refresh" class="quiet" type="button" aria-label="Refresh selection" title="Refresh selection">↻</button>
+    </header>
+    <main>
+      <section id="state" class="state" aria-live="polite">
+        <span class="state-icon" aria-hidden="true">⌖</span>
+        <h1 id="state-title">Reading selection…</h1>
+        <p id="state-description">Your element properties will appear here.</p>
+      </section>
+      <div id="inspector" hidden>
+        <section class="identity">
+          <span id="node-type" class="badge"></span>
+          <h1 id="node-name"></h1>
+          <p>Properties from your current selection</p>
+        </section>
+        <section aria-labelledby="properties-title">
+          <h2 id="properties-title">Properties</h2>
+          <dl id="properties" class="properties"></dl>
+        </section>
+        <section id="warnings-section" class="warnings" hidden aria-labelledby="warnings-title">
+          <h2 id="warnings-title">Not included in CSS</h2>
+          <ul id="warnings"></ul>
+        </section>
+        <section class="css-section" aria-labelledby="css-title">
+          <div class="section-heading"><h2 id="css-title">CSS</h2><button id="copy" type="button">Copy CSS</button></div>
+          <pre tabindex="0" aria-label="Generated CSS"><code id="css-code"></code></pre>
+          <p id="copy-status" class="copy-status" role="status" aria-live="polite"></p>
+        </section>
+      </div>
+    </main>
+    <footer>Local inspection · No data leaves Figma</footer>
+    <script type="module" src="./index.ts"></script>
+  </body>
+</html>
