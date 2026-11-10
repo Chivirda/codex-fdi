@@ -43,3 +43,17 @@ pre { margin: 0; padding: 14px; min-width: 0; max-width: 100%; white-space: pre;
 footer { border-top: 1px solid var(--figma-color-border, #e7e9ef); padding: 13px 30px 20px 18px; color: var(--figma-color-text-tertiary, #868b99); font-size: 10px; }
 #resize-handle { position: fixed; right: 0; bottom: 0; width: 24px; height: 24px; padding: 0; border: 0; border-radius: 5px 0 0 0; background: var(--figma-color-bg, #fff); color: var(--figma-color-text-secondary, #717583); cursor: nwse-resize; touch-action: none; user-select: none; z-index: 2; }
 #resize-handle:focus-visible { outline-offset: -3px; }
+.spacing-section { margin-bottom: 23px; }
+.spacing-units { display: flex; gap: 3px; }
+.spacing-units button { padding: 4px 9px; font-size: 11px; }
+.spacing-units button[aria-pressed="true"] { background: var(--figma-color-bg-brand-tertiary, #eeeefe); color: var(--figma-color-text-brand, #545dcc); border-color: var(--figma-color-border-brand, #5e67eb); }
+.spacing-base-label { display: flex; align-items: center; justify-content: space-between; gap: 10px; color: var(--figma-color-text-secondary, #717583); font-size: 11px; margin-bottom: 10px; }
+.spacing-base-label input { width: 78px; min-width: 0; border: 1px solid var(--figma-color-border, #dfe2e9); border-radius: 5px; padding: 5px 7px; font: inherit; color: var(--figma-color-text, #242631); background: var(--figma-color-bg, #fff); }
+.spacing-base-label input:focus-visible { outline: 2px solid var(--figma-color-border-brand, #5e67eb); outline-offset: 1px; }
+.spacing-base-label input[aria-invalid="true"] { border-color: var(--figma-color-border-danger, #d34a4a); }
+.spacing-error { color: var(--figma-color-text-danger, #c83d3d); font-size: 11px; line-height: 1.5; margin-bottom: 8px; }
+.spacing-parent { font-size: 11px; font-weight: 550; margin: 10px 0 5px; overflow-wrap: anywhere; }
+.spacing-note { color: var(--figma-color-text-secondary, #717583); font-size: 10px; line-height: 1.6; overflow-wrap: anywhere; margin-bottom: 8px; }
+.spacing-warnings { padding-left: 15px; font-size: 11px; color: var(--figma-color-text-warning, #90611b); line-height: 1.6; overflow-wrap: anywhere; }
+.spacing-warnings:empty { display: none; }
+.spacing-row { padding: 7px 0; }

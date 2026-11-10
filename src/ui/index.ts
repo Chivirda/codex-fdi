@@ -2,6 +2,7 @@ import type { InspectorNode, InspectorState, RGBA, UIMessage } from '../shared/c
 import { parseInspectorMessage } from './messages';
 import { generateDeclarations } from '../css/generate';
 import { installWindowResize } from './resize';
+import { installSpacingInspector } from './spacing';
 
 function element<T extends HTMLElement>(id: string): T {
   const result = document.getElementById(id);
@@ -16,6 +17,7 @@ const copyStatus = element('copy-status');
 let currentCSS = '';
 let copying = false;
 let loadingTimeout: ReturnType<typeof setTimeout> | undefined;
+const showSpacing = installSpacingInspector(element, text => fallbackCopy(text, null));
 
 function send(message: UIMessage): void {
   parent.postMessage({ pluginMessage: message }, '*');
@@ -78,6 +80,7 @@ function showProperties(node: InspectorNode): void {
 }
 
 function render(state: InspectorState): void {
+  showSpacing(state.status === 'ready' ? state.node.spacing : undefined);
   clearTimeout(loadingTimeout);
   loadingTimeout = undefined;
   if (state.status === 'loading') {

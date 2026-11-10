@@ -15,6 +15,12 @@ function node(value: unknown): value is InspectorNode {
   if (!['backgroundColor', 'color'].every(key => optional(value[key], color))) return false;
   if (!optional(value.borderRadius, item => finite(item) || tuple(item))) return false;
   if (!optional(value.border, item => object(item) && finite(item.width) && color(item.color))) return false;
+  if (!optional(value.spacing, item => object(item) && (
+    (item.status === 'unsupported' && text(item.message))
+    || (item.status === 'ready' && text(item.parentName) && text(item.parentType)
+      && Array.isArray(item.warnings) && item.warnings.every(text)
+      && object(item.values) && ['top', 'right', 'bottom', 'left', 'x', 'y', 'width', 'height'].every(key => finite((item.values as ObjectValue)[key])))
+  ))) return false;
   if (!optional(value.layout, item => object(item)
     && choice(item.direction, ['row', 'column'])
     && optional(item.alignItems, alignment => choice(alignment, ['flex-start', 'center', 'flex-end', 'baseline']))

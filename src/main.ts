@@ -1,4 +1,5 @@
 import { normalizeNode } from './adapter/normalize';
+import { inspectSpacing } from './adapter/spacing';
 import { generateCSS } from './css/generate';
 import type { InspectorState, PluginMessage } from './shared/contracts';
 import { DEFAULT_WINDOW_SIZE, normalizeWindowSize } from './shared/window-size';
@@ -37,6 +38,7 @@ function inspect(): void {
     const selected = selection[0];
     if (!selected) return send({ status: 'empty' });
     const node = normalizeNode(selected);
+    node.spacing = inspectSpacing(selected, node);
     send({ status: 'ready', node, css: generateCSS(node) });
   } catch (error) {
     send({ status: 'error', message: error instanceof Error ? error.message : 'Unable to inspect selection.' });

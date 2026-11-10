@@ -1,3 +1,4 @@
+import type { SpacingResult } from './spacing';
 /** Serializable, API-independent contract. Omitted fields are not reliably representable. */
 export interface RGBA { r: number; g: number; b: number; a: number }
 export interface InspectorNode {
@@ -6,6 +7,7 @@ export interface InspectorNode {
   type: string;
   width?: number;
   height?: number;
+  spacing?: SpacingResult;
   layout?: {
     direction: 'row' | 'column';
     alignItems?: 'flex-start' | 'center' | 'flex-end' | 'baseline';

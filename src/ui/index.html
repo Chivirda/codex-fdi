@@ -27,6 +27,16 @@
           <h2 id="properties-title">Properties</h2>
           <dl id="properties" class="properties"></dl>
         </section>
+        <section class="spacing-section" aria-labelledby="spacing-title">
+          <div class="section-heading"><h2 id="spacing-title">Spacing</h2><div class="spacing-units" role="group" aria-label="Spacing units"><button id="spacing-px" type="button" aria-pressed="true">px</button><button id="spacing-rem" type="button" aria-pressed="false">rem</button></div></div>
+          <label class="spacing-base-label" for="spacing-base">Base (px per rem)<input id="spacing-base" type="number" min="0.001" step="any" value="16" aria-describedby="spacing-base-error" /></label>
+          <p id="spacing-base-error" class="spacing-error" role="alert" hidden></p>
+          <p id="spacing-parent" class="spacing-parent"></p>
+          <p class="spacing-note">Bounds of the transformed layout rectangle in the parent’s axes. X/Y mark the minimum bounds; width/height are projected sizes and can differ from Properties when rotated. Strokes and visual contours are excluded.</p>
+          <p id="spacing-unsupported" class="spacing-note"></p>
+          <dl id="spacing-values" class="properties"></dl>
+          <ul id="spacing-warnings" class="spacing-warnings"></ul>
+        </section>
         <section id="warnings-section" class="warnings" hidden aria-labelledby="warnings-title">
           <h2 id="warnings-title">Not included in CSS</h2>
           <ul id="warnings"></ul>

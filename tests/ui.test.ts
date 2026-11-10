@@ -2,6 +2,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseInspectorMessage } from '../src/ui/messages';
 
 const ready = { status: 'ready', node: { id: '1', name: 'Frame', type: 'FRAME', width: 100, warnings: [] }, css: '.inspected-element { width: 100px; }' };
+const spacing = { status: 'ready', parentName: 'Card', parentType: 'FRAME', values: { top: 24, right: 56, bottom: 80, left: 24, x: 24, y: 24, width: 120, height: 64 }, warnings: ['Rotated bounds are projected.'] };
 const envelope = (state: unknown): unknown => ({ pluginMessage: { type: 'inspector-state', state } });
 
 class MockElement {
@@ -40,6 +41,7 @@ describe('UI host transport', () => {
   let body: MockElement;
   const descendants = (root: MockElement): MockElement[] => root.children.flatMap(child => [child, ...descendants(child)]);
   const propertyButton = (property: string): MockElement | undefined => descendants(elements.get('properties')!).find(item => item.attributes.get('aria-label') === `Copy ${property} declaration`);
+  const spacingButton = (key: string): MockElement | undefined => descendants(elements.get('spacing-values')!).find(item => item.attributes.get('aria-label') === `Copy spacing ${key} value`);
   const receive = (state: unknown): void => messageListener({ source: null, data: envelope(state) });
   const settle = async (): Promise<void> => { await Promise.resolve(); await Promise.resolve(); await Promise.resolve(); };
   beforeEach(async () => {
@@ -176,6 +178,114 @@ describe('UI host transport', () => {
     expect(body.children[body.children.length - 1]?.value).toBe(ready.css);
     expect(elements.get('copy-status')?.textContent).toBe('CSS copied to clipboard.');
   });
+  it('renders all eight spacing bounds, parent identity and warnings without changing Properties', async () => {
+    receive({ ...ready, node: { ...ready.node, spacing } });
+    expect(elements.get('spacing-parent')?.textContent).toBe('Parent: Card · FRAME');
+    expect(elements.get('spacing-warnings')?.children[0]?.textContent).toContain('Rotated bounds');
+    expect(elements.get('spacing-values')?.children).toHaveLength(8);
+    expect(descendants(elements.get('properties')!).some(item => item.textContent === '100 px')).toBe(true);
+    for (const [key, value] of Object.entries(spacing.values)) {
+      spacingButton(key)?.listeners.get('click')?.();
+      await settle();
+      expect(writeText).toHaveBeenLastCalledWith(`${value}px`);
+    }
+  });
+  it('switches spacing units, edits rem base and preserves settings across selection changes', async () => {
+    receive({ ...ready, node: { ...ready.node, spacing } });
+    elements.get('spacing-rem')?.listeners.get('click')?.();
+    expect(elements.get('spacing-rem')?.attributes.get('aria-pressed')).toBe('true');
+    spacingButton('top')?.listeners.get('click')?.();
+    await settle();
+    expect(writeText).toHaveBeenLastCalledWith('1.5rem');
+    elements.get('spacing-base')!.value = '12';
+    elements.get('spacing-base')?.listeners.get('input')?.();
+    receive({ ...ready, node: { ...ready.node, id: '2', spacing } });
+    spacingButton('top')?.listeners.get('click')?.();
+    await settle();
+    expect(writeText).toHaveBeenLastCalledWith('2rem');
+    expect(spacing.values.top).toBe(24);
+    expect(elements.get('spacing-base')?.value).toBe('12');
+  });
+  it('disables spacing copy for invalid rem bases and recovers in px or after correction', async () => {
+    receive({ ...ready, node: { ...ready.node, spacing } });
+    elements.get('spacing-rem')?.listeners.get('click')?.();
+    for (const base of ['', '0', '-2', 'Infinity', 'no']) {
+      elements.get('spacing-base')!.value = base;
+      elements.get('spacing-base')?.listeners.get('input')?.();
+      expect(spacingButton('top')?.disabled).toBe(true);
+      expect(elements.get('spacing-base-error')?.textContent).toContain('greater than 0');
+      spacingButton('top')?.listeners.get('click')?.();
+      expect(writeText).not.toHaveBeenCalled();
+    }
+    elements.get('spacing-px')?.listeners.get('click')?.();
+    expect(spacingButton('top')?.disabled).toBe(false);
+    expect(elements.get('spacing-base-error')?.hidden).toBe(true);
+    spacingButton('top')?.listeners.get('click')?.();
+    await settle();
+    expect(writeText).toHaveBeenLastCalledWith('24px');
+    elements.get('spacing-base')!.value = '16';
+    elements.get('spacing-base')?.listeners.get('input')?.();
+    elements.get('spacing-rem')?.listeners.get('click')?.();
+    expect(elements.get('spacing-base-error')?.hidden).toBe(true);
+    expect(spacingButton('top')?.disabled).toBe(false);
+  });
+  it('shows unsupported spacing instead of stale rows or parent data', () => {
+    receive({ ...ready, node: { ...ready.node, spacing } });
+    receive({ ...ready, node: { ...ready.node, spacing: { status: 'unsupported', message: 'No parent bounds.' } } });
+    expect(elements.get('spacing-unsupported')?.textContent).toBe('No parent bounds.');
+    expect(elements.get('spacing-values')?.children).toHaveLength(0);
+    expect(elements.get('spacing-parent')?.hidden).toBe(true);
+    expect(elements.get('spacing-warnings')?.children).toHaveLength(0);
+  });
+  it('reports rem conversion overflow for a tiny finite base and recovers', async () => {
+    receive({ ...ready, node: { ...ready.node, spacing } });
+    elements.get('spacing-rem')?.listeners.get('click')?.();
+    elements.get('spacing-base')!.value = '5e-324';
+    elements.get('spacing-base')?.listeners.get('input')?.();
+    expect(elements.get('spacing-base-error')?.hidden).toBe(false);
+    expect(elements.get('spacing-base-error')?.textContent).toContain('too small');
+    expect(spacingButton('top')?.disabled).toBe(true);
+    spacingButton('top')?.listeners.get('click')?.();
+    expect(writeText).not.toHaveBeenCalled();
+    elements.get('spacing-px')?.listeners.get('click')?.();
+    expect(elements.get('spacing-base-error')?.hidden).toBe(true);
+    spacingButton('top')?.listeners.get('click')?.();
+    await settle();
+    expect(writeText).toHaveBeenLastCalledWith('24px');
+    elements.get('spacing-base')!.value = '16';
+    elements.get('spacing-base')?.listeners.get('input')?.();
+    elements.get('spacing-rem')?.listeners.get('click')?.();
+    expect(elements.get('spacing-base-error')?.hidden).toBe(true);
+    spacingButton('top')?.listeners.get('click')?.();
+    await settle();
+    expect(writeText).toHaveBeenLastCalledWith('1.5rem');
+  });
+  it('supports spacing clipboard fallback and reports copy errors locally', async () => {
+    writeText.mockRejectedValue(new Error('Denied'));
+    receive({ ...ready, node: { ...ready.node, spacing } });
+    spacingButton('top')?.listeners.get('click')?.();
+    await settle();
+    expect(body.children[body.children.length - 1]?.value).toBe('24px');
+    expect(spacingButton('top')?.textContent).toBe('✓');
+    expect(spacingButton('top')?.successfulFocus).toBe(true);
+    execCommand.mockReturnValue(false);
+    spacingButton('right')?.listeners.get('click')?.();
+    await settle();
+    const messages = descendants(elements.get('spacing-values')!).filter(item => item.attributes.get('role') === 'status');
+    expect(messages.some(item => item.textContent.includes('Copy unavailable.'))).toBe(true);
+    expect(elements.get('copy-status')?.textContent).toBe('');
+  });
+  it('does not apply pending spacing feedback or fallback after switching selections', async () => {
+    let reject: ((reason: Error) => void) | undefined;
+    writeText.mockReturnValue(new Promise<void>((_resolve, rejectPromise) => { reject = rejectPromise; }));
+    receive({ ...ready, node: { ...ready.node, spacing } });
+    spacingButton('top')?.listeners.get('click')?.();
+    receive({ status: 'empty' });
+    reject?.(new Error('Denied'));
+    await settle();
+    expect(execCommand).not.toHaveBeenCalled();
+    expect(elements.get('spacing-values')?.children).toHaveLength(0);
+  });
   it('ignores malformed host payloads without leaving the loading state', () => {
     messageListener({ source: null, data: envelope({ ...ready, node: { ...ready.node, layout: { direction: 'row', padding: 'invalid' } } }) });
     expect(elements.get('state-title')?.textContent).toBe('Reading selection…');
@@ -186,6 +296,12 @@ describe('message validation', () => {
   it('accepts supported state envelopes', () => {
     for (const state of [ready, { status: 'loading' }, { status: 'empty' }, { status: 'multiple', count: 2 }, { status: 'error', message: 'Failed' }]) {
       expect(parseInspectorMessage(envelope(state))).toEqual(state);
+    }
+  });
+  it('validates nested spacing payloads and finite values', () => {
+    expect(parseInspectorMessage(envelope({ ...ready, node: { ...ready.node, spacing } }))).toBeDefined();
+    for (const invalid of [null, { ...spacing, parentName: 3 }, { ...spacing, warnings: ['ok', 1] }, { ...spacing, values: { ...spacing.values, x: NaN } }, { ...spacing, values: { top: 1 } }, { status: 'unsupported', message: false }]) {
+      expect(parseInspectorMessage(envelope({ ...ready, node: { ...ready.node, spacing: invalid } }))).toBeUndefined();
     }
   });
   it('rejects unrelated, incomplete and nonfinite payloads', () => {

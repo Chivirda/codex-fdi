@@ -1,13 +1,15 @@
 import { afterEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('../src/adapter/normalize', () => ({
-  normalizeNode: () => ({ id: '1', name: 'Frame', type: 'FRAME', width: 120, warnings: [] }),
+  normalizeNode: () => ({ id: '1', name: 'Frame', type: 'FRAME', width: 120, height: 80, warnings: [] }),
 }));
 
 const settle = async (): Promise<void> => { for (let i = 0; i < 8; i++) await Promise.resolve(); };
 function setup(storage: Promise<unknown> = Promise.resolve(undefined)) {
   const events = new Map<string, () => void>();
-  const page = { selection: [{ id: '1' }], on: vi.fn(), off: vi.fn() };
+  const page = { selection: [{ id: '1', type: 'RECTANGLE', absoluteTransform: [[1, 0, 10], [0, 1, 20]],
+    parent: { type: 'FRAME', name: 'Parent', width: 500, height: 400, absoluteTransform: [[1, 0, 0], [0, 1, 0]] },
+  }], on: vi.fn(), off: vi.fn() };
   const host = {
     showUI: vi.fn(), currentPage: page,
     ui: { postMessage: vi.fn(), resize: vi.fn(), onmessage: undefined as undefined | ((message: unknown) => void) },
@@ -29,6 +31,10 @@ describe('Figma host transport', () => {
     host.ui.onmessage?.({ type: 'ready' });
     expect(host.ui.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({
       type: 'inspector-state', state: expect.objectContaining({ status: 'ready', css: expect.stringContaining('width: 120px;') }),
+    }));
+    expect(host.ui.postMessage.mock.lastCall?.[0].state.node.spacing).toEqual(expect.objectContaining({
+      status: 'ready', parentName: 'Parent',
+      values: { top: 20, right: 370, bottom: 300, left: 10, x: 10, y: 20, width: 120, height: 80 },
     }));
     page.selection = [];
     events.get('selectionchange')?.();
