@@ -1,6 +1,7 @@
 import type { InspectorNode, InspectorState, RGBA, UIMessage } from '../shared/contracts';
 import { parseInspectorMessage } from './messages';
 import { generateDeclarations } from '../css/generate';
+import { installWindowResize } from './resize';
 
 function element<T extends HTMLElement>(id: string): T {
   const result = document.getElementById(id);
@@ -218,5 +219,6 @@ window.addEventListener('message', (event: MessageEvent<unknown>) => {
   if (state) render(state);
 });
 
+installWindowResize(element('resize-handle'), send);
 render({ status: 'loading' });
 send({ type: 'ready' });

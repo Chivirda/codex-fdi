@@ -34,4 +34,5 @@ export type InspectorState =
   | { status: 'error'; message: string }
   | { status: 'ready'; node: InspectorNode; css: string };
 export type PluginMessage = { type: 'inspector-state'; state: InspectorState };
-export type UIMessage = { type: 'ready' } | { type: 'refresh' };
+export type UIMessage = { type: 'ready' } | { type: 'refresh' }
+  | { type: 'resize'; width: number; height: number; finished: boolean };

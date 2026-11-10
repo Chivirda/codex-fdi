@@ -60,7 +60,7 @@ describe('UI host transport', () => {
       execCommand,
     });
     vi.stubGlobal('parent', { postMessage });
-    vi.stubGlobal('window', { addEventListener: (_type: string, listener: typeof messageListener) => { messageListener = listener; } });
+    vi.stubGlobal('window', { addEventListener: (type: string, listener: typeof messageListener) => { if (type === 'message') messageListener = listener; } });
     await import('../src/ui/index');
   });
   afterEach(() => {
