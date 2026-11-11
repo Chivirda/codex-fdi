@@ -261,3 +261,42 @@ describe('section presentation preferences', () => {
     expect(host.ui.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'inspector-state' }));
   });
 });
+
+describe('Project Styles host bridge', () => {
+  const profile = { version: 1, name: 'Egispro', remBase: 10, files: [] };
+  it('restores and saves only whitelisted metadata, preserving inspector transport', async () => {
+    const { host } = setup(Promise.resolve(profile));
+    await import('../src/main');
+    host.ui.onmessage?.({ type: 'styles-profile-ready' });
+    await settle();
+    expect(host.ui.postMessage).toHaveBeenLastCalledWith({ type: 'styles-profile', profile });
+    host.ui.onmessage?.({ type: 'save-styles-profile', profile: { ...profile, name: 'Updated', css: 'PRIVATE CSS', index: {} } });
+    await settle();
+    expect(host.clientStorage.setAsync).toHaveBeenLastCalledWith('design-inspector-styles-profile-v1', { ...profile, name: 'Updated' });
+    host.ui.onmessage?.({ type: 'ready' });
+    expect(host.ui.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'inspector-state' }));
+  });
+  it('does not undo edits when profile metadata loads late', async () => {
+    let restore: ((value: unknown) => void) | undefined;
+    const { host } = setup(new Promise(resolve => { restore = resolve; }));
+    await import('../src/main');
+    host.ui.onmessage?.({ type: 'save-styles-profile', profile });
+    host.ui.onmessage?.({ type: 'styles-profile-ready' });
+    restore?.({ ...profile, name: 'Old profile' });
+    await settle();
+    expect(host.ui.postMessage).toHaveBeenLastCalledWith({ type: 'styles-profile', profile });
+  });
+  it('handles parsing in the plugin sandbox when workers are unavailable without persisting CSS', async () => {
+    vi.useFakeTimers();
+    const { host } = setup();
+    await import('../src/main');
+    host.ui.onmessage?.({ type: 'styles-request', request: { id: 10, command: { type: 'import', id: 'main', name: 'main.css', css: '.card{width:100px;height:50px}' } } });
+    expect(host.ui.postMessage).not.toHaveBeenCalledWith(expect.objectContaining({ type: 'styles-reply' }));
+    vi.runOnlyPendingTimers();
+    expect(host.ui.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'styles-reply', reply: { id: 10, response: expect.objectContaining({ snapshot: expect.objectContaining({ classes: 1 }) }) } }));
+    expect(host.clientStorage.setAsync).not.toHaveBeenCalled();
+    host.ui.onmessage?.({ type: 'styles-request', request: { id: 11, command: { type: 'import', id: 'bad', name: 'bad.css', css: '.bad{' } } });
+    vi.runOnlyPendingTimers();
+    expect(host.ui.postMessage).toHaveBeenLastCalledWith(expect.objectContaining({ type: 'styles-reply', reply: { id: 11, error: expect.any(String) } }));
+  });
+});

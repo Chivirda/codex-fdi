@@ -1,6 +1,9 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseInspectorMessage, parseResizeError } from '../src/ui/messages';
 
+// File/worker controls have separate tests; keep existing inspector interaction tests isolated.
+vi.mock('../src/ui/project-styles', () => ({ installProjectStyles: () => ({ setSelection: () => {}, restoreProfile: () => {} }) }));
+
 const ready = { status: 'ready', node: { id: '1', name: 'Frame', type: 'FRAME', width: 100, warnings: [] }, css: '.inspected-element { width: 100px; }' };
 const spacing = { status: 'ready', parentName: 'Card', parentType: 'FRAME', values: { top: 24, right: 56, bottom: 80, left: 24, x: 24, y: 24, width: 120, height: 64 }, warnings: ['Rotated bounds are projected.'] };
 const envelope = (state: unknown): unknown => ({ pluginMessage: { type: 'inspector-state', state } });
@@ -227,7 +230,7 @@ describe('UI host transport', () => {
     expect(elements.get('spacing-rem')?.attributes.get('aria-pressed')).toBe('true');
     spacingButton('top')?.listeners.get('click')?.();
     await settle();
-    expect(writeText).toHaveBeenLastCalledWith('1.5rem');
+    expect(writeText).toHaveBeenLastCalledWith('2.4rem');
     elements.get('spacing-base')!.value = '12';
     elements.get('spacing-base')?.listeners.get('input')?.();
     receive({ ...ready, node: { ...ready.node, id: '2', spacing } });

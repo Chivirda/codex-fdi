@@ -4,6 +4,9 @@ import { generateDeclarations } from '../css/generate';
 import { installWindowResize } from './resize';
 import { installSpacingInspector } from './spacing';
 import { installSections } from './sections';
+import { createStylesClient } from '../styles/client';
+import { parseStylesProfile } from '../styles/profile';
+import { installProjectStyles } from './project-styles';
 
 function element<T extends HTMLElement>(id: string): T {
   const result = document.getElementById(id);
@@ -26,6 +29,8 @@ let copying = false;
 let loadingTimeout: ReturnType<typeof setTimeout> | undefined;
 const showSpacing = installSpacingInspector(element, text => fallbackCopy(text, null));
 const applySections = installSections(element, send);
+const stylesClient = createStylesClient(send);
+const projectStyles = installProjectStyles(element('project-styles-root'), stylesClient, send);
 
 function send(message: UIMessage): void {
   parent.postMessage({ pluginMessage: message }, '*');
@@ -88,6 +93,7 @@ function showProperties(node: InspectorNode): void {
 }
 
 function render(state: InspectorState): void {
+  projectStyles.setSelection(state.status === 'ready' ? state.node : undefined);
   selectionVersion++;
   currentText = undefined;
   textCopyButton.hidden = true;
@@ -294,6 +300,21 @@ element('refresh').addEventListener('click', () => {
 });
 
 window.addEventListener('message', (event: MessageEvent<unknown>) => {
+  if (event.data && typeof event.data === 'object' && 'pluginMessage' in event.data) {
+    const message = (event.data as { pluginMessage?: unknown }).pluginMessage;
+    if (message && typeof message === 'object' && 'type' in message) {
+      if (message.type === 'styles-reply' && 'reply' in message && message.reply && typeof message.reply === 'object') {
+        const reply = message.reply;
+        if ('id' in reply && typeof reply.id === 'number' && (('error' in reply && typeof reply.error === 'string') || 'response' in reply)) stylesClient.receive(reply as import('../shared/project-styles').StylesReply);
+        return;
+      }
+      if (message.type === 'styles-profile' && 'profile' in message) {
+        const profile = parseStylesProfile(message.profile);
+        if (profile) projectStyles.restoreProfile(profile);
+        return;
+      }
+    }
+  }
   const sections = parseSectionMessage(event.data);
   if (sections) {
     applySections(sections);

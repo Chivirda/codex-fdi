@@ -1,0 +1,23 @@
+#project-styles-root { padding: 0 11px 11px; min-width: 0; }
+.project-fields { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: 8px; }
+.project-field { display: flex; flex-direction: column; gap: 5px; margin-bottom: 10px; min-width: 0; font-size: 12px; color: var(--figma-color-text-secondary, #656b7c); }
+.project-field input { min-width: 0; width: 100%; padding: 6px; border: 1px solid var(--figma-color-border, #dfe2e9); border-radius: 5px; font: inherit; color: var(--figma-color-text, #242631); background: var(--figma-color-bg, #fff); }
+.project-status, .project-stats, .project-help { margin: 8px 0; font-size: 12px; line-height: 1.6; color: var(--figma-color-text-secondary, #656b7c); overflow-wrap: anywhere; }
+.project-status { color: var(--figma-color-text, #242631); }
+.project-file, .project-match { border-top: 1px solid var(--figma-color-border, #e1e4ec); padding: 8px 0; min-width: 0; }
+.project-file-name { margin-bottom: 6px; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.project-file-replace { max-width: 100%; font-size: 12px; margin-bottom: 6px; display: block; }
+.project-button { padding: 5px 8px; font-size: 12px; }
+.project-copy-group { display: flex; flex-wrap: wrap; align-items: center; gap: 7px; margin: 7px 0; }
+.project-copy-status { font-size: 12px; line-height: 1.5; color: var(--figma-color-text-secondary, #656b7c); }
+.project-match > summary, .project-variable-suggestions > summary { padding: 5px 0; font-size: 13px; line-height: 1.6; overflow-wrap: anywhere; }
+.project-match > summary::before, .project-variable-suggestions > summary::before, .project-property-group > summary::before, .project-coverage > summary::before { content: '›'; display: inline-block; margin-right: 6px; }
+.project-match[open] > summary::before, .project-variable-suggestions[open] > summary::before, .project-property-group[open] > summary::before, .project-coverage[open] > summary::before { transform: rotate(90deg); }
+.project-property-group, .project-coverage { margin: 7px 0; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.project-property-group ul, .project-limitations, .project-notices { margin: 6px 0; padding-left: 17px; font-size: 12px; line-height: 1.6; overflow-wrap: anywhere; }
+.project-notices:empty, .project-limitations:empty { display: none; }
+.project-error, .project-limitations, .project-notices { color: var(--figma-color-text-warning, #90611b); }
+.project-override { font-size: 12px; margin: 6px 0; padding: 8px; }
+.project-variable { padding: 7px 0; border-top: 1px solid var(--figma-color-border, #e1e4ec); }
+.project-variable code { overflow-wrap: anywhere; white-space: pre-wrap; font-size: 12px; }
+#project-styles-root input:focus-visible { outline: 2px solid var(--figma-color-border-brand, #5e67eb); outline-offset: 1px; }

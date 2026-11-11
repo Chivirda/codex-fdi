@@ -1,5 +1,6 @@
 import type { SpacingResult } from './spacing';
 import type { SectionState } from './sections';
+import type { StylesProfile, StylesRequest, StylesReply } from './project-styles';
 /** Serializable, API-independent contract. Omitted fields are not reliably representable. */
 export interface RGBA { r: number; g: number; b: number; a: number }
 export interface InspectorNode {
@@ -40,9 +41,14 @@ export type InspectorState =
   | { status: 'ready'; node: InspectorNode; css: string };
 export type PluginMessage = { type: 'inspector-state'; state: InspectorState }
   | { type: 'resize-error'; message: string }
-  | { type: 'section-state'; sections: SectionState };
+  | { type: 'section-state'; sections: SectionState }
+  | { type: 'styles-reply'; reply: StylesReply }
+  | { type: 'styles-profile'; profile: StylesProfile };
 export type UIMessage = { type: 'ready' } | { type: 'refresh' }
   | { type: 'resize'; width: number; height: number; finished: boolean }
   | { type: 'window-bounds'; availableWidth: number; availableHeight: number }
   | { type: 'sections-ready' }
-  | { type: 'set-sections'; sections: SectionState };
+  | { type: 'set-sections'; sections: SectionState }
+  | { type: 'styles-request'; request: StylesRequest }
+  | { type: 'styles-profile-ready' }
+  | { type: 'save-styles-profile'; profile: StylesProfile };

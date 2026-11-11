@@ -23,3 +23,7 @@ Spacing uses the immediate parent's coordinate system: inverse(parent absolute t
 Contract is fixed before parallel implementation. Coordinate contract changes with lead; do not edit another owner's files. Missing, mixed, unsupported or unreliable values must be omitted with explanatory warnings. All data must be JSON serializable; never pass Figma nodes or symbols to UI. Colors use 0..1 channels. Radius and padding tuples follow top/right/bottom/left (radius: top-left/top-right/bottom-right/bottom-left).
 
 Run `npm run typecheck`, `npm test`, and `npm run build` before handoff. Do not claim Figma runtime validation unless performed. Independent review after integration; bounded fixes.
+
+## Project Styles v0.5–v0.6
+
+`src/shared/project-styles.ts` defines the serializable contract. `src/styles/parser.ts` uses PostCSS and selector-parser; `normalize.ts` handles safe value/shorthand normalization; `index.ts` owns conservative scope/cascade indexing; `match.ts` is pure and independent of DOM/Figma. `session.ts` holds parsed session data, `worker.ts` and `client.ts` provide Worker-first typed transport with a sandbox fallback in main. `profile.ts` validates metadata-only storage. `src/ui/project-styles.ts` renders data using textContent; never inject imported CSS or fetch @import/URLs. Preserve unknown/contextual effects, bounded input/work/output and atomic per-file replacement. Persist profile metadata only; require reimport across launches. Existing inspector CSS generation remains the source for matching Figma properties.

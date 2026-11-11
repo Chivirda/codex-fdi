@@ -6,6 +6,9 @@ import { DEFAULT_WINDOW_SIZE, normalizeWindowSize } from './shared/window-size';
 import type { WindowSize } from './shared/window-size';
 import { DEFAULT_SECTIONS, parseSectionState } from './shared/sections';
 import type { SectionState } from './shared/sections';
+import { DEFAULT_STYLES_PROFILE, parseStylesProfile } from './styles/profile';
+import type { StylesProfile, StylesRequest } from './shared/project-styles';
+import { StylesSession, respondToStyles } from './styles/session';
 
 declare const __html__: string;
 figma.showUI(__html__, { ...DEFAULT_WINDOW_SIZE, themeColors: true });
@@ -18,6 +21,15 @@ let resizeErrorVisible = false;
 let saveTimer: ReturnType<typeof setTimeout> | undefined;
 // Serialize writes: a slow earlier save must never overwrite the final dimensions.
 let saves: Promise<void> = Promise.resolve();
+const STYLES_PROFILE_KEY = 'design-inspector-styles-profile-v1';
+let stylesProfile: StylesProfile = { ...DEFAULT_STYLES_PROFILE, files: [] };
+let stylesProfileChanged = false;
+let profileSaves: Promise<void> = Promise.resolve();
+const stylesProfileLoaded = figma.clientStorage.getAsync(STYLES_PROFILE_KEY).then((stored: unknown) => {
+  if (!stylesProfileChanged) stylesProfile = parseStylesProfile(stored) ?? stylesProfile;
+}).catch(() => { /* Local imports remain usable without persistent metadata. */ });
+let fallbackStyles: StylesSession | undefined;
+let queuedStyleRequests = 0;
 const SECTIONS_KEY = 'design-inspector-sections';
 let sections: SectionState = { ...DEFAULT_SECTIONS };
 let sectionsChanged = false;
@@ -79,6 +91,35 @@ function inspect(): void {
 figma.ui.onmessage = (message: unknown) => {
   if (!message || typeof message !== 'object' || !('type' in message)) return;
   if (message.type === 'ready' || message.type === 'refresh') inspect();
+  if (message.type === 'styles-profile-ready') {
+    void stylesProfileLoaded.then(() => figma.ui.postMessage({ type: 'styles-profile', profile: stylesProfile } satisfies PluginMessage));
+  }
+  if (message.type === 'save-styles-profile' && 'profile' in message) {
+    const profile = parseStylesProfile(message.profile);
+    if (!profile) return;
+    stylesProfile = profile;
+    stylesProfileChanged = true;
+    profileSaves = profileSaves.then(() => figma.clientStorage.setAsync(STYLES_PROFILE_KEY, profile)).catch(() => { /* CSS is not stored. */ });
+  }
+  if (message.type === 'styles-request' && 'request' in message && message.request && typeof message.request === 'object') {
+    const request = message.request as StylesRequest;
+    if (!Number.isSafeInteger(request.id) || !request.command || typeof request.command !== 'object') return;
+    if (queuedStyleRequests >= 16) {
+      figma.ui.postMessage({ type: 'styles-reply', reply: { id: request.id, error: 'CSS analysis is busy. Try again shortly.' } } satisfies PluginMessage);
+      return;
+    }
+    queuedStyleRequests++;
+    // Fallback runs in the plugin sandbox, never by synchronous parsing inside the UI iframe.
+    setTimeout(() => {
+      queuedStyleRequests--;
+      try {
+        fallbackStyles ??= new StylesSession();
+        figma.ui.postMessage({ type: 'styles-reply', reply: respondToStyles(fallbackStyles, request) } satisfies PluginMessage);
+      } catch {
+        figma.ui.postMessage({ type: 'styles-reply', reply: { id: request.id, error: 'CSS analysis failed. Try a smaller file.' } } satisfies PluginMessage);
+      }
+    }, 0);
+  }
   if (message.type === 'sections-ready') {
     void sectionsLoaded.then(() => {
       figma.ui.postMessage({ type: 'section-state', sections: { ...sections } } satisfies PluginMessage);
