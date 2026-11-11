@@ -73,11 +73,11 @@ describe('project CSS indexing and matching', () => {
     const result = match('.first{width:100px!important;height:50px}.second{width:90px;color:red}', node);
     expect(result.matches.find(item => item.classes.length === 2)?.different).toEqual([]);
   });
-  it('generates only minimal changed/missing declarations and preserves important conflicts', () => {
+  it('generates only confirmed differing declarations and preserves important conflicts', () => {
     const result = match('.card{box-sizing:border-box;width:100px;height:50px;color:blue!important}', {
       ...frame, color: { r: 1, g: 0, b: 0, a: 1 }, opacity: 0.5,
     });
-    expect(result.matches[0]?.override).toBe('.card {\n  color: rgb(255, 0, 0) !important;\n  opacity: 0.5;\n}');
+    expect(result.matches[0]?.override).toBe('.card {\n  color: rgb(255, 0, 0) !important;\n}');
   });
   it('keeps unknown CSS values incomparable rather than equating matching raw strings', () => {
     const result = match('.card{width:100px;height:50px;color:currentColor}', { ...frame, color: { r: 0, g: 0, b: 0, a: 1 } });

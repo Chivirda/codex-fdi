@@ -55,7 +55,7 @@ function selectors(text: string, contextual: boolean, budget: { selectors: numbe
     return {
       text: selector.toString().trim(), classes: [...classes],
       kind: simple && !contextual ? 'simple' : unsupported ? 'unsupported' : 'conditional',
-      specificity: specificity(selector),
+      specificity: specificity(selector), simple,
       ...(!simple || contextual ? { reason: contextual ? 'Rule depends on an at-rule or nested-selector context.' : unsupported ? 'Selector requires unsupported nesting or has no class.' : 'Compound selectors, states, elements and combinators require document context.' } : {}),
     };
   });

@@ -154,7 +154,7 @@ describe('Project Styles UI', () => {
   it('gates class and override copying by category and copies raw safe class tokens', async () => {
     matching.matches = ['safe', 'conditional', 'unsupported'].map(category => ({
       classes: ['button', 'primary'], selector: '.button.primary', category: category as 'safe' | 'conditional' | 'unsupported', score: 90, confidence: 'high',
-      matched: [], different: [], missing: [], incomparable: [], limitations: [], coverage: {}, override: 'width: 100px;',
+      matched: [], different: [{ property: 'width', figma: '100px', css: '90px' }], missing: [], incomparable: [], limitations: [], coverage: {}, override: 'width: 100px;',
     }));
     await importFiles(new File(['.a{}'], 'a.css'));
     controller.setSelection(node()); vi.advanceTimersByTime(120); await flush();
@@ -162,10 +162,53 @@ describe('Project Styles UI', () => {
     expect(copyButtons.map(item => item.disabled)).toEqual([false, true, true]);
     copyButtons[0]?.click(); await flush();
     expect(writeText).toHaveBeenLastCalledWith('button primary');
-    const override = descendants(root).filter(item => item.textContent === 'Copy override');
-    expect(override.map(item => item.disabled)).toEqual([false, true, true]);
-    override[0]?.click(); await flush();
+    expect(descendants(root).some(item => item.textContent === 'Copy override')).toBe(false);
+    expect(byText('Override selector: .inspected-element')).toBeDefined();
+    const choose = descendants(root).filter(item => item.textContent === 'Use for override');
+    expect(choose.map(item => item.disabled)).toEqual([false, true, true]);
+    choose[0]?.click();
+    expect(byText('Override selector: .button.primary')).toBeDefined();
+    byText('Copy override').click(); await flush();
     expect(writeText).toHaveBeenLastCalledWith('width: 100px;');
+  });
+  it('copies original contextual CSS and allows only unambiguous class tokens without implying an override', async () => {
+    matching.matches = [{ classes: ['card'], selector: '.card', category: 'conditional', copyable: true,
+      score: 60, confidence: 'low', matched: [], different: [], missing: [], incomparable: [], limitations: [], coverage: {},
+      matchedCSS: '@media (max-width:600px) { .card {font-size:1.6rem;} }' }];
+    await importFiles(new File(['.card{}'], 'a.css'));
+    controller.setSelection(node()); vi.advanceTimersByTime(120); await flush();
+    byText('Copy class').click(); await flush();
+    expect(writeText).toHaveBeenLastCalledWith('card');
+    byText('Copy matched CSS').click(); await flush();
+    expect(writeText).toHaveBeenLastCalledWith(matching.matches[0]!.matchedCSS);
+    byText('Use for override').click();
+    expect(byText('No override needed')).toBeDefined();
+    expect(descendants(root).some(item => item.textContent.startsWith('Override unavailable:'))).toBe(false);
+    expect(byText('Selected by property similarity. Verify that this class applies on the page.')).toBeDefined();
+    expect(descendants(root).some(item => item.textContent === 'Copy override')).toBe(false);
+    controller.setSelection(node('new'));
+    expect(byText('Override selector: .inspected-element')).toBeDefined();
+  });
+  it('still blocks contextual overrides when there are confirmed differences', async () => {
+    matching.matches = [{ classes: ['card'], selector: '.card', category: 'conditional', copyable: true,
+      score: 60, confidence: 'low', matched: [], different: [{ property: 'width', figma: '100px', css: '90px' }],
+      missing: [], incomparable: [], limitations: [], coverage: {} }];
+    await importFiles(new File(['.card{}'], 'a.css'));
+    controller.setSelection(node()); vi.advanceTimersByTime(120); await flush();
+    byText('Use for override').click();
+    expect(byText('Override unavailable: conditional or unsupported rules require DOM/media context.')).toBeDefined();
+    expect(descendants(root).some(item => item.textContent === 'No override needed' || item.textContent === 'Copy override')).toBe(false);
+  });
+  it('shows no override needed only after explicit selection when there are no confirmed differences', async () => {
+    matching.matches = [{ classes: ['card'], selector: '.card', category: 'safe', score: 25, confidence: 'low',
+      matched: [], different: [], missing: [{property: 'height', figma: '50px'}], incomparable: [], limitations: [], coverage: {} }];
+    await importFiles(new File(['.card{}'], 'a.css'));
+    controller.setSelection(node()); vi.advanceTimersByTime(120); await flush();
+    expect(descendants(root).some(item => item.textContent === 'No override needed')).toBe(false);
+    byText('Use for override').click();
+    expect(byText('No override needed')).toBeDefined();
+    expect(byText('Selected by property similarity. Verify that this class applies on the page.')).toBeDefined();
+    expect(descendants(root).some(item => item.textContent === 'Copy override')).toBe(false);
   });
   it('copies safe variable declarations with a local fallback and blocks malformed class tokens', async () => {
     matching.matches = [{ classes: ['unsafe token'], selector: '.unsafe', category: 'safe', score: 1, confidence: 'low', matched: [], different: [], missing: [], incomparable: [], limitations: [], coverage: {} }];

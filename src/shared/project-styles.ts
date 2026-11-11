@@ -8,7 +8,7 @@ export interface ImportedDeclaration {
 }
 export interface SelectorInfo {
   text: string; classes: string[]; kind: 'simple' | 'conditional' | 'unsupported';
-  specificity: [number, number, number]; reason?: string;
+  specificity: [number, number, number]; reason?: string; simple?: boolean;
 }
 export interface ImportedRule {
   selectors: SelectorInfo[]; declarations: ImportedDeclaration[];
@@ -26,6 +26,7 @@ export interface ParsedStylesheet {
 }
 export interface NormalizationOptions { remBase?: number; variables?: Record<string, string> }
 export interface IndexedClass {
+  rules?: ImportedRule[]; copyable?: boolean;
   className: string; selectors: string[]; declarations: ImportedDeclaration[];
   category: 'safe' | 'conditional' | 'unsupported'; limitations: string[]; sources: SourceLocation[];
 }
@@ -39,6 +40,7 @@ export interface StyleMatch {
   score: number; confidence: 'high' | 'medium' | 'low';
   matched: MatchProperty[]; different: MatchProperty[]; missing: MatchProperty[]; incomparable: MatchProperty[];
   limitations: string[]; coverage: Record<string, string[]>; override?: string;
+  copyable?: boolean; matchedCSS?: string;
 }
 export interface VariableSuggestion { property: string; variable: string; declaration: string; value: string }
 export interface MatchingResult { matches: StyleMatch[]; variables: VariableSuggestion[]; warnings: string[] }

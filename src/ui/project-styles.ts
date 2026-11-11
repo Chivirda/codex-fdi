@@ -1,5 +1,6 @@
 import type { InspectorNode, UIMessage } from '../shared/contracts';
 import { CSS_LIMITS, type FileMetadata, type ProjectSnapshot, type StylesProfile, type StyleMatch, type MatchingResult } from '../shared/project-styles';
+import { formatMatchValue } from '../styles/numeric';
 import type { StylesClient } from '../styles/client';
 
 const emptySnapshot = (): ProjectSnapshot => ({ files: [], classes: 0, variables: 0, rules: 0, warnings: [] });
@@ -40,13 +41,15 @@ export function installProjectStyles(root: HTMLElement, client: StylesClient, se
   const filesPanel = make('div', 'project-files');
   const matchesPanel = make('div', 'project-matches');
   const notices = make('ul', 'project-notices');
+  const overridePanel = make('div', 'project-selected-override');
+  let activeOverridePanel: HTMLElement | undefined;
   const refresh = button('Refresh imported files', () => enqueue(async () => {
     for (const [id, file] of retained) await importFile(id, file);
     applySnapshot((await client.request({ type: 'refresh' })).snapshot);
     status.textContent = 'Refreshed retained file snapshots. Reselect a file to load newer disk contents.';
   }));
   const help = make('p', 'project-help', 'CSS stays in this session. Saved files are reimport reminders only; the first successful import replaces these reminders. Default project rem base is 10 px and can be changed. Refresh rereads retained browser File snapshots; reselect files for newer disk contents. Up to 8 files, 2 MiB each, 4 MiB total.');
-  root.replaceChildren(fields, fileLabel, refresh, status, stats, filesPanel, notices, matchesPanel, help);
+  root.replaceChildren(fields, fileLabel, refresh, status, stats, filesPanel, notices, overridePanel, matchesPanel, help);
 
   const retained = new Map<string, File>();
   const metadata = new Map<string, FileMetadata>();
@@ -111,7 +114,7 @@ export function installProjectStyles(root: HTMLElement, client: StylesClient, se
       void run();
     });
     copy.disabled = !enabled;
-    if (!enabled) copy.title = 'Only safe, unconditional class matches can be copied.';
+    if (!enabled) copy.title = 'This action requires an unambiguous class or available source CSS.';
     group.append(copy, feedback);
     return group;
   };
@@ -134,16 +137,35 @@ export function installProjectStyles(root: HTMLElement, client: StylesClient, se
   const renderMatch = (match: StyleMatch, version: number): void => {
     const details = make('details', 'project-match');
     details.append(make('summary', '', `${match.selector} · ${match.confidence} confidence · ${match.category} · score ${Number(match.score.toFixed(3))}`));
-    details.append(copyControl('Copy class', match.classes.join(' '), match.category === 'safe' && validTokens(match.classes), version));
-    if (match.override) {
-      const override = make('pre', 'project-override'); override.textContent = match.override;
-      details.append(override, copyControl('Copy override', match.override, match.category === 'safe', version));
-    }
+    const copyable = (match.copyable ?? match.category === 'safe') && validTokens(match.classes);
+    details.append(copyControl('Copy class', match.classes.join(' '), copyable, version));
+    details.append(copyControl('Copy matched CSS', match.matchedCSS ?? '', Boolean(match.matchedCSS), version));
+    const selectedOverride = make('div', 'project-candidate-override');
+    const choose = button('Use for override', () => {
+      if (!copyable || generation !== version) return;
+      activeOverridePanel?.replaceChildren();
+      activeOverridePanel = selectedOverride;
+      overridePanel.replaceChildren(make('p', 'project-help', `Override selector: ${match.selector}`));
+      if (match.confidence === 'low' || match.category !== 'safe') selectedOverride.append(make('p', 'project-help', 'Selected by property similarity. Verify that this class applies on the page.'));
+      if (!match.different.length) {
+        selectedOverride.append(make('p', 'project-help', 'No override needed'));
+        selectedOverride.append(make('p', 'project-help', 'No confirmed differences. Missing and incomparable properties are not added to the override.'));
+      } else if (match.category !== 'safe') {
+        selectedOverride.append(make('p', 'project-help', 'Override unavailable: conditional or unsupported rules require DOM/media context.'));
+      } else if (match.override) {
+        const preview = make('pre', 'project-override', match.override);
+        selectedOverride.append(preview, copyControl('Copy override', match.override, true, version));
+      } else {
+        selectedOverride.append(make('p', 'project-help', match.different.length ? 'Override unavailable: differences cannot be safely resolved.' : 'No override needed'));
+      }
+    });
+    choose.disabled = !copyable;
+    details.append(choose, selectedOverride);
     for (const [label, properties] of [['Matched', match.matched], ['Different', match.different], ['Missing', match.missing], ['Incomparable', match.incomparable]] as const) {
       const group = make('details', 'project-property-group');
       group.append(make('summary', '', `${label} (${properties.length})`));
       const list = make('ul');
-      for (const property of properties) list.append(make('li', '', `${property.property}: Figma ${property.figma ?? '—'}; CSS ${property.css ?? '—'}${property.reason ? ` · ${property.reason}` : ''}`));
+      for (const property of properties) list.append(make('li', '', `${property.property}: Figma ${formatMatchValue(property.figma)}; CSS ${formatMatchValue(property.css)}${property.reason ? ` · ${property.reason}` : ''}`));
       group.append(list); details.append(group);
     }
     const limits = make('ul', 'project-limitations');
@@ -156,6 +178,7 @@ export function installProjectStyles(root: HTMLElement, client: StylesClient, se
   const scheduleMatch = (): void => {
     clearTimeout(matchTimer);
     const version = generation;
+    overridePanel.replaceChildren(make('p', 'project-help', 'Override selector: .inspected-element'), make('p', 'project-help', 'Select a candidate explicitly to inspect its override.'));
     matchesPanel.replaceChildren();
     if (remBase() === undefined) { matchesPanel.append(make('p', 'project-error', 'Enter a finite project rem base greater than 0.')); return; }
     if (!selected) { matchesPanel.append(make('p', 'project-help', 'Select one element to compare project classes.')); return; }

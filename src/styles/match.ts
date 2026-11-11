@@ -2,6 +2,7 @@ import type { InspectorNode } from '../shared/contracts';
 import type {
   ImportedDeclaration, IndexedClass, MatchProperty, MatchingResult, NormalizationOptions, StyleIndex, StyleMatch, VariableSuggestion,
 } from '../shared/project-styles';
+import { equivalent, formatMatchValue } from './numeric';
 import { generateDeclarations } from '../css/generate';
 import { cascade, COMPARABLE_PROPERTIES, expandedDeclarations } from './index';
 
@@ -53,7 +54,7 @@ function candidate(entries: IndexedClass[], expected: ImportedDeclaration[]): St
     const property = { property: declaration.property, figma: declaration.normalized ?? declaration.value };
     if (!other) missing.push(property);
     else if (other.normalized === undefined || declaration.normalized === undefined) incomparable.push({ ...property, css: other.value, reason: other.reason ?? declaration.reason ?? 'Value cannot be reliably normalized.' });
-    else if (other.normalized === declaration.normalized) matched.push({ ...property, css: other.normalized });
+    else if (equivalent(declaration.property, other.normalized, declaration.normalized)) matched.push({ ...property, css: other.normalized });
     else different.push({ ...property, css: other.normalized });
   }
   for (const declaration of declarations) if (!desired.has(declaration.property)) {
@@ -89,15 +90,15 @@ function candidate(entries: IndexedClass[], expected: ImportedDeclaration[]): St
   const coverage: Record<string, string[]> = Object.create(null) as Record<string, string[]>;
   for (const entry of entries) {
     const properties = new Map(typographyContext(entry.declarations).map(declaration => [declaration.property, declaration.normalized]));
-    coverage[entry.className] = matched.filter(property => properties.get(property.property) === property.figma).map(property => property.property);
+    coverage[entry.className] = matched.filter(property => equivalent(property.property, properties.get(property.property), property.figma)).map(property => property.property);
   }
-  const result: StyleMatch = { classes, selector: selectorFor(classes), category, score, confidence, matched, different, missing, incomparable, limitations, coverage };
+  const result: StyleMatch = { classes, selector: selectorFor(classes), category, score, confidence, matched, different, missing, incomparable, limitations, coverage, copyable: entries.every(entry => entry.copyable ?? entry.category === 'safe') };
   if (category === 'safe' && groups >= 2 && !incomparable.length) {
-    const changes = [...different, ...missing].map(property => {
+    const changes = different.map(property => {
       const declaration = desired.get(property.property);
       if (!declaration || declaration.normalized === undefined) return undefined;
       const important = actual.get(property.property)?.important ? ' !important' : '';
-      return `  ${property.property}: ${declaration.value}${important};`;
+      return `  ${property.property}: ${formatMatchValue(declaration.value)}${important};`;
     }).filter((line): line is string => line !== undefined);
     if (changes.length) {
       result.override = [`${result.selector} {`, ...changes, '}'].join('\n');
@@ -129,7 +130,7 @@ function suggestions(expected: ImportedDeclaration[], index: StyleIndex, options
         const normalized = expandedDeclarations([{ ...declaration, value: `var(${variable})`, normalized: undefined, reason: undefined }], options);
         cache.set(key, normalized.find(item => item.property === declaration.property)?.normalized);
       }
-      if (cache.get(key) === declaration.normalized) {
+      if (equivalent(declaration.property, cache.get(key), declaration.normalized)) {
         result.push({ property: declaration.property, variable, declaration: `${declaration.property}: var(${variable});`, value: declaration.normalized });
         if (result.length === 12) return result;
       }
@@ -167,6 +168,25 @@ export function findMatches(node: InspectorNode, index: StyleIndex, options: Nor
     const pair = candidate([first, second], expected);
     if (pair.score > Math.max(partial[a]!.score, partial[b]!.score)) pairs.push(pair);
   }
-  return { matches: [...singles, ...pairs].sort(rank).slice(0, 12), variables: suggestions(expected, index, normalization),
+  const matches = [...singles, ...pairs].sort(rank).slice(0, 12);
+  // Serialize original rules only for retained candidates; never substitute
+  // normalized expansions or Figma values. Preserve every conditional wrapper.
+  for (const match of matches) {
+    const rules = [...new Set(match.classes.flatMap(name => byName.get(name)?.rules ?? []))].sort((a, b) => a.order - b.order);
+    let size = 0;
+    const blocks: string[] = [];
+    for (const rule of rules) {
+      let css = `${rule.selectors.map(selector => selector.text).join(', ')} {\n${rule.declarations.map(d => `  ${d.property}: ${d.value}${d.important ? ' !important' : ''};`).join('\n')}\n}`;
+      for (const context of [...rule.conditions].reverse()) {
+        const wrapper = context.startsWith('selector(') ? context.slice(9, -1) : context;
+        css = `${wrapper} {\n${css.split('\n').map(line => `  ${line}`).join('\n')}\n}`;
+      }
+      size += css.length;
+      if (size > 65536) { blocks.length = 0; match.limitations.push('Matched CSS exceeds the 64 KiB copy limit; inspect the source file.'); break; }
+      blocks.push(css);
+    }
+    if (blocks.length) match.matchedCSS = blocks.join('\n\n');
+  }
+  return { matches, variables: suggestions(expected, index, normalization),
     warnings: [...index.warnings, 'Pair search considers at most 40 pairs from the top 12 partial single-class candidates; it is not an exhaustive class-combination search.'] };
 }

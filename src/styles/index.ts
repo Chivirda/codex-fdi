@@ -150,6 +150,7 @@ export function buildStyleIndex(files: ParsedStylesheet[], options: Normalizatio
         if (normalizedCount > 100000) throw new Error('CSS index exceeds 100000 normalized declaration components. Import fewer or smaller stylesheets.');
         declarations.push(...normalized);
       }
+      const sourceRule = { ...rule, order: ruleCount };
       const affected = declarations.filter(declaration => COMPARABLE_PROPERTIES.has(declaration.property));
       for (const selector of rule.selectors) {
         if (!selector.classes.length) {
@@ -160,10 +161,12 @@ export function buildStyleIndex(files: ParsedStylesheet[], options: Normalizatio
           let entry = classes.get(className);
           if (!entry) {
             if (classes.size >= 12000) throw new Error('CSS index exceeds 12000 unique classes. Import fewer stylesheets.');
-            entry = { result: { className, selectors: [], declarations: [], category: 'safe', limitations: [], sources: [] }, safe: [], contextual: [] };
+            entry = { result: { className, rules: [], copyable: true, selectors: [], declarations: [], category: 'safe', limitations: [], sources: [] }, safe: [], contextual: [] };
             classes.set(className, entry);
           }
           const result = entry.result;
+          if (!result.rules!.includes(sourceRule)) result.rules!.push(sourceRule);
+          if (!selector.simple) result.copyable = false;
           if (!result.selectors.includes(selector.text)) result.selectors.push(selector.text);
           addSource(result.sources, rule.source);
           // Keep generated combined selectors and HTML class tokens unambiguous.
