@@ -31,6 +31,15 @@ describe('Tree MVP A contract (no Figma or DOM)', () => {
     input.completeness = 'complete';
     expect(parseTreeSnapshot(input)).toBeUndefined();
   });
+  it('keeps property-budget placeholders without inventing inspector data or descendant counts', () => {
+    const input = minimalTree();
+    input.nodes.child = { id: 'child', parentId: 'root', childIds: [], branch: { status: 'truncated', reason: 'string-limit', omittedChildren: 0 } };
+    input.completeness = 'partial';
+    input.diagnostics = [{ code: 'TREE_TRUNCATED', severity: 'warning', nodeId: 'child', revision: 2, message: 'Properties too large.' }];
+    expect(parseTreeSnapshot(input)).toEqual(input);
+    input.nodes.child.branch = { status: 'truncated', reason: 'node-limit', omittedChildren: 0 };
+    expect(parseTreeSnapshot(input)).toBeUndefined();
+  });
   it('represents inaccessible nodes without inventing names, metrics or visibility', () => {
     const input = minimalTree();
     input.nodes.child = { id: 'child', parentId: 'root', childIds: [], branch: { status: 'omitted', reason: 'unavailable', omittedChildren: null } };

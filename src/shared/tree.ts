@@ -77,7 +77,7 @@ const inspector = shape({ id, name: text, type: id, warnings: array(text) }, {
 const unknownCount: Guard = v => v === null || integer(v);
 const branch: Guard = v => shape({ status: one('complete') })(v)
   || shape({ status: one('omitted'), reason: one('hidden', 'unavailable'), omittedChildren: unknownCount })(v)
-  || shape({ status: one('truncated'), reason: one('node-limit', 'depth-limit', 'time-limit', 'byte-limit', 'string-limit'), omittedChildren: v => v === null || integer(v) && (v as number) > 0 })(v)
+  || shape({ status: one('truncated'), reason: one('node-limit', 'depth-limit', 'time-limit', 'byte-limit', 'string-limit'), omittedChildren: unknownCount })(v)
   || shape({ status: one('unsupported'), reason: id, omittedChildren: unknownCount })(v);
 const treeNode = shape({ id, parentId: v => v === null || id(v), childIds: array(id), branch },
   { inspector, visible: bool, locked: bool, geometry: shape({ absoluteTransform: matrix }, { parentLocalTransform: matrix }) });
@@ -141,7 +141,8 @@ function snapshotValid(value: unknown): value is TreeSnapshot {
   for (const [key, node] of entries) {
     if (!treeNode(node) || key !== node.id || (node.inspector && node.inspector.id !== key) || node.childIds.length > TREE_LIMITS.maxNodes
       || (node.inspector?.characters !== undefined && node.inspector.type !== 'TEXT')) return false;
-    if (!node.inspector && !(node.branch.status === 'omitted' && node.branch.reason === 'unavailable')) return false;
+    if (!node.inspector && node.branch.status === 'complete') return false;
+    if (node.branch.status === 'truncated' && node.branch.omittedChildren === 0 && !['string-limit', 'byte-limit'].includes(node.branch.reason)) return false;
     if (node.branch.status === 'omitted' && (node.childIds.length || (node.branch.reason === 'hidden' && (node.visible !== false || snapshot.includeHidden)))) return false;
     if (!snapshot.includeHidden && node.visible === false && !(node.branch.status === 'omitted' && node.branch.reason === 'hidden')) return false;
     if (node.branch.status === 'unsupported' && node.childIds.length) return false;

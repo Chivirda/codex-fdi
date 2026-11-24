@@ -23,6 +23,29 @@ function inverse(value: Matrix): Matrix | undefined {
   return matrix(result) ? result : undefined;
 }
 
+/** Stable source matrix; no Figma access or layout inference. */
+export function isStableTransform(value: unknown): value is Matrix {
+  return matrix(value) && inverse(value) !== undefined;
+}
+
+/** Immediate parent coordinates, including Group/Boolean levels. */
+export function parentLocalTransform(nodeTransform: Matrix, parentTransform: Matrix): Matrix | undefined {
+  if (!matrix(nodeTransform) || !matrix(parentTransform)) return undefined;
+  const parentInverse = inverse(parentTransform);
+  if (!parentInverse || !inverse(nodeTransform)) return undefined;
+  const [[a, c], [b, d]] = parentInverse;
+  const [[na, nc, ntx], [nb, nd, nty]] = nodeTransform;
+  // Subtract origins before multiplying to avoid cancellation between two large
+  // transformed translations. This is inverse(parentAbsolute) * nodeAbsolute.
+  const dx = ntx - parentTransform[0][2];
+  const dy = nty - parentTransform[1][2];
+  const relative: Matrix = [
+    [a * na + c * nb, a * nc + c * nd, a * dx + c * dy],
+    [b * na + d * nb, b * nc + d * nd, b * dx + d * dy],
+  ];
+  return matrix(relative) && inverse(relative) ? relative : undefined;
+}
+
 /** Layout-rectangle AABB in the immediate parent's local coordinate system. */
 export function calculateSpacing(input: GeometryInput): SpacingResult {
   if (!input || !input.parent || !dimension(input.width) || !dimension(input.height)
@@ -36,18 +59,8 @@ export function calculateSpacing(input: GeometryInput): SpacingResult {
   if (!parentInverse || !inverse(input.nodeTransform)) {
     return unsupported('Spacing is unavailable for singular, near-singular or unstable transforms.');
   }
-  const [[a, c], [b, d]] = parentInverse;
-  const [[na, nc, ntx], [nb, nd, nty]] = input.nodeTransform;
-  // Subtract origins before multiplying to avoid cancellation between two large
-  // transformed translations. This is inverse(parentAbsolute) * nodeAbsolute.
-  const dx = ntx - input.parent.transform[0][2];
-  const dy = nty - input.parent.transform[1][2];
-  const relative: Matrix = [
-    [a * na + c * nb, a * nc + c * nd, a * dx + c * dy],
-    [b * na + d * nb, b * nc + d * nd, b * dx + d * dy],
-  ];
-  if (!matrix(relative)) return unsupported('Spacing calculation overflowed the supported numeric range.');
-  if (!inverse(relative)) return unsupported('Spacing is unavailable for an unstable parent-relative transform.');
+  const relative = parentLocalTransform(input.nodeTransform, input.parent.transform);
+  if (!relative) return unsupported('Spacing is unavailable for an unstable parent-relative transform.');
   const [[ra, rc, rx], [rb, rd, ry]] = relative;
   const corners = [[0, 0], [input.width, 0], [0, input.height], [input.width, input.height]] as const;
   const xs = corners.map(([x, y]) => ra * x + rc * y + rx);
