@@ -95,3 +95,41 @@ footer { position: relative; flex: none; min-height: 36px; display: flex; flex-d
 .spacing-coordinates .spacing-cell { display: grid; grid-template-columns: 16px minmax(0, 1fr); align-items: center; gap: 5px; }
 .spacing-coordinates .spacing-cell dd { margin-top: 0; }
 .spacing-value { overflow-wrap: anywhere; }
+
+/* Tree is a bounded read-only preview; its controls stay alive across selections. */
+.tree-section { margin-top: 10px; margin-bottom: 10px; }
+#tree-root, .tree-toolbar, .tree-selected { min-width: 0; max-width: 100%; }
+.tree-toolbar { display: flex; flex-wrap: wrap; gap: 6px; align-items: center; }
+.tree-toolbar button { padding: 6px 8px; }
+.tree-hidden-label { display: flex; gap: 4px; align-items: center; font-size: 11px; }
+.tree-hidden-label input { accent-color: var(--figma-color-bg-brand, #5e67eb); }
+.tree-hidden-label input:focus-visible { outline: 2px solid var(--figma-color-border-brand, #5e67eb); outline-offset: 2px; }
+.tree-root-label { overflow: hidden; white-space: nowrap; text-overflow: ellipsis; margin-top: 8px; font-size: 12px; }
+.tree-status, .tree-help { font-size: 11px; line-height: 1.6; color: var(--figma-color-text-secondary, #717583); overflow-wrap: anywhere; margin: 7px 0; }
+.tree-progress { display: block; width: 100%; height: 7px; margin-bottom: 8px; accent-color: var(--figma-color-bg-brand, #5e67eb); }
+.tree-list { min-width: 0; max-width: 100%; max-height: 300px; overflow-y: auto; overflow-x: hidden; padding: 3px; border: 1px solid var(--figma-color-border, #dfe2e9); border-radius: 5px; }
+.tree-row { display: flex; align-items: center; gap: 5px; width: 100%; min-width: 0; min-height: 30px; padding: 4px 6px; text-align: left; border: 1px solid transparent; border-radius: 4px; font-size: 12px; }
+.tree-row[aria-selected="true"] { border-color: var(--figma-color-border-brand, #5e67eb); background: var(--figma-color-bg-brand-tertiary, #eeeefe); }
+.tree-row:focus-visible { outline-offset: -2px; }
+.tree-arrow { flex: 0 0 22px; min-height: 24px; display: inline-flex; align-items: center; justify-content: center; }
+.tree-node-name { flex: 1 1 auto; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-node-badge { flex: 0 1 90px; min-width: 0; font-size: 9px; line-height: 1.4; color: var(--figma-color-text-secondary, #717583); overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.tree-selected { border-top: 1px solid var(--figma-color-border, #dfe2e9); padding-top: 10px; margin-top: 10px; }
+.tree-selected h3 { margin: 0; font-size: 12px; }
+.tree-selected-name { font-size: 12px; line-height: 1.5; overflow-wrap: anywhere; }
+.tree-node-warnings, .tree-diagnostics ul { padding-left: 16px; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; }
+.tree-node-warnings { color: var(--figma-color-text-warning, #90611b); }
+.tree-diagnostic-link { max-width: 100%; padding: 4px 0; border: 0; border-radius: 0; text-align: left; font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; color: var(--figma-color-text-warning, #90611b); }
+.tree-diagnostics ul { max-height: 200px; overflow-y: auto; }
+.tree-node-css { max-height: 200px; overflow: auto; }
+.tree-node-text { max-height: 160px; overflow-y: auto; white-space: pre-wrap; overflow-wrap: anywhere; }
+.tree-export-host { min-width: 0; border-top: 1px solid var(--figma-color-border, #dfe2e9); margin-top: 12px; padding-top: 10px; }
+.tree-export-host h3 { margin: 0; font-size: 12px; }
+.tree-export-field { display: flex; flex-direction: column; gap: 4px; margin: 8px 0; font-size: 11px; min-width: 0; }
+.tree-export-field input, .tree-export-field select { width: 100%; min-width: 0; padding: 6px; border-radius: 5px; border: 1px solid var(--figma-color-border, #dfe2e9); background: var(--figma-color-bg, #fff); color: inherit; font: inherit; }
+.tree-export-field input:focus-visible, .tree-export-field select:focus-visible { outline: 2px solid var(--figma-color-border-brand, #5e67eb); outline-offset: 1px; }
+.tree-export-mapping, .tree-export-status { font-size: 11px; line-height: 1.6; overflow-wrap: anywhere; margin: 7px 0; }
+.tree-export-actions { display: flex; flex-wrap: wrap; gap: 6px; }
+.tree-export-actions button { padding: 6px 8px; }
+.tree-export-html, .tree-export-css { max-height: 260px; overflow: auto; }
+.tree-export-field input[aria-invalid="true"] { border-color: var(--figma-color-border-danger, #d34a4a); }

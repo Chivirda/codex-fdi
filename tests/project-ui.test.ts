@@ -210,6 +210,21 @@ describe('Project Styles UI', () => {
     expect(byText('Selected by property similarity. Verify that this class applies on the page.')).toBeDefined();
     expect(descendants(root).some(item => item.textContent === 'Copy override')).toBe(false);
   });
+  it('offers explicit block-name reuse only for a single BEM-compatible candidate and guards stale actions', async () => {
+    const apply = vi.fn().mockReturnValue(true);
+    controller = installProjectStyles(root as unknown as HTMLElement, { request }, send, apply);
+    matching.matches = [
+      { classes: ['cookie-banner'], copyable: true },
+      { classes: ['a', 'b'], copyable: true },
+      { classes: ['complex'], copyable: false },
+      { classes: ['w-1/2'], copyable: true },
+    ].map(item => ({ ...item, selector: '.candidate', category: 'conditional', score: 50, confidence: 'low', matched: [], different: [], missing: [], incomparable: [], limitations: [], coverage: {} }));
+    await importFiles(new File(['.a{}'], 'a.css')); controller.setSelection(node()); vi.advanceTimersByTime(120); await flush();
+    const choices = descendants(root).filter(item => item.textContent === 'Use as block class');
+    expect(choices.map(item => item.disabled)).toEqual([false, true, true, true]);
+    choices[0]!.click(); expect(apply).toHaveBeenLastCalledWith('cookie-banner', '1');
+    controller.setSelection(node('new')); choices[0]!.click(); expect(apply).toHaveBeenCalledTimes(1);
+  });
   it('copies safe variable declarations with a local fallback and blocks malformed class tokens', async () => {
     matching.matches = [{ classes: ['unsafe token'], selector: '.unsafe', category: 'safe', score: 1, confidence: 'low', matched: [], different: [], missing: [], incomparable: [], limitations: [], coverage: {} }];
     matching.variables = [{ property: 'color', variable: '--brand', declaration: 'color: var(--brand);', value: '#fff' }];

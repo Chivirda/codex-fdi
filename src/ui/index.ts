@@ -1,3 +1,4 @@
+import { installTreeInspector } from './tree';
 import type { InspectorNode, InspectorState, RGBA, UIMessage } from '../shared/contracts';
 import { parseInspectorMessage, parseResizeError, parseSectionMessage } from './messages';
 import { generateDeclarations } from '../css/generate';
@@ -30,7 +31,8 @@ let loadingTimeout: ReturnType<typeof setTimeout> | undefined;
 const showSpacing = installSpacingInspector(element, text => fallbackCopy(text, null));
 const applySections = installSections(element, send);
 const stylesClient = createStylesClient(send);
-const projectStyles = installProjectStyles(element('project-styles-root'), stylesClient, send);
+const treeInspector = installTreeInspector(element('tree-root'), send);
+const projectStyles = installProjectStyles(element('project-styles-root'), stylesClient, send, (className, rootId) => treeInspector.useBlockClass(className, rootId));
 
 function send(message: UIMessage): void {
   parent.postMessage({ pluginMessage: message }, '*');
@@ -93,6 +95,7 @@ function showProperties(node: InspectorNode): void {
 }
 
 function render(state: InspectorState): void {
+  treeInspector.setSelection(state);
   projectStyles.setSelection(state.status === 'ready' ? state.node : undefined);
   selectionVersion++;
   currentText = undefined;
@@ -302,6 +305,7 @@ element('refresh').addEventListener('click', () => {
 window.addEventListener('message', (event: MessageEvent<unknown>) => {
   if (event.data && typeof event.data === 'object' && 'pluginMessage' in event.data) {
     const message = (event.data as { pluginMessage?: unknown }).pluginMessage;
+    if (treeInspector.receive(message)) return;
     if (message && typeof message === 'object' && 'type' in message) {
       if (message.type === 'styles-reply' && 'reply' in message && message.reply && typeof message.reply === 'object') {
         const reply = message.reply;

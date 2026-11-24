@@ -46,3 +46,8 @@ Before any future implementation, the Lead fixes the corresponding contract and 
 - Tech Lead for integration/QA: tests/tree-contract.test.ts, tests/tree-main.test.ts, tests/fixtures/tree/**. Shared tree contracts, revision/cancellation and runtime message validation are fixed before traversal/UI code starts. Geometry ownership and existing module ownership remain as defined above.
 
 Tree-ready/children messages must be separate from InspectorState.ready; do not add mandatory children to InspectorNode. No HTML, layout inference, new parser or Project Sync is part of the baseline checkpoint.
+
+
+## Useful structure export slice (owner request, 24 November 2026)
+
+The owner explicitly prioritized a usable HTML/CSS draft, a manual block class, BEM-like child classes and explicit reuse of a root candidate name over a read-only tree. This changes the order of implementation, not the unperformed acceptance gates. Lead owns src/shared/export.ts, src/structure/plan.ts, src/export/serialize.ts and tests/structure.test.ts/tests/export.test.ts as reserved above. UI owns src/ui/tree-export.ts and tests/tree-export-ui.test.ts plus integration in tree/project-styles/index. Keep pure planning/serialization independent of DOM/Figma. Use the existing generateDeclarations for all node CSS; structural HTML default resets must be explicit. Export is a bounded draft, with source mapping and visible placeholders/exclusions, never an assertion of browser cascade, semantics or pixel equivalence. No automatic heading/interactive inference or unknown assets. Root Styles action reuses a single unambiguous BEM-compatible class name only; child matching and CSS reuse/override resolution remain future work. Existing Tree MVP A review/manual gates stay open.

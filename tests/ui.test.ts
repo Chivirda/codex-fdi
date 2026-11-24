@@ -1,3 +1,4 @@
+import { minimalTree } from './fixtures/tree/minimal';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import { parseInspectorMessage, parseResizeError } from '../src/ui/messages';
 
@@ -12,6 +13,7 @@ class MockElement {
   constructor(public tagName = '') {}
   hidden = false;
   disabled = false;
+  checked = false;
   textContent = '';
   className = '';
   type = '';
@@ -26,10 +28,10 @@ class MockElement {
   select = vi.fn();
   listeners = new Map<string, () => void>();
   append(...children: MockElement[]): void { this.children.push(...children); }
-  replaceChildren(): void {
+  replaceChildren(...children: MockElement[]): void {
     const detach = (child: MockElement): void => { child.isConnected = false; child.children.forEach(detach); };
     this.children.forEach(detach);
-    this.children = [];
+    this.children = children;
   }
   setAttribute(name: string, value: string): void { this.attributes.set(name, value); }
   remove(): void { this.isConnected = false; }
@@ -94,6 +96,21 @@ describe('UI host transport', () => {
     expect(elements.get('css-code')?.textContent).toBe(ready.css);
     vi.advanceTimersByTime(9000);
     expect(elements.get('inspector')?.hidden).toBe(false);
+  });
+  it('relays the tree controller without changing selection properties or the existing CSS', () => {
+    receive({ ...ready, node: { ...ready.node, id: 'root' } });
+    const treeRoot = elements.get('tree-root')!;
+    const inspect = descendants(treeRoot).find(node => node.textContent === 'Inspect subtree')!;
+    inspect.listeners.get('click')?.();
+    expect(postMessage).toHaveBeenCalledWith({ pluginMessage: { type: 'tree-inspect', requestId: 1, rootId: 'root', includeHidden: false } }, '*');
+    const identity = { requestId: 1, rootId: 'root', revision: 1, documentSessionId: 'session' };
+    messageListener({ source: null, data: { pluginMessage: { type: 'tree-started', ...identity } } });
+    messageListener({ source: null, data: { pluginMessage: { type: 'tree-ready', ...identity, snapshot: { ...minimalTree(), ...identity } } } });
+    expect(descendants(treeRoot).filter(node => node.attributes.get('role') === 'treeitem')).toHaveLength(2);
+    expect(elements.get('css-code')!.textContent).toBe(ready.css);
+    expect(elements.get('node-name')!.textContent).toBe('Frame');
+    messageListener({ source: null, data: { pluginMessage: { type: 'tree-stale', ...identity, reason: 'document' } } });
+    expect(descendants(treeRoot).filter(node => node.attributes.get('role') === 'treeitem')).toHaveLength(0);
   });
   it('ends loading on timeout and recovers through refresh and a host response', () => {
     vi.advanceTimersByTime(8000);

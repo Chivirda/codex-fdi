@@ -1,3 +1,4 @@
+import { validBlockClass } from '../shared/export';
 import type { InspectorNode, UIMessage } from '../shared/contracts';
 import { CSS_LIMITS, type FileMetadata, type ProjectSnapshot, type StylesProfile, type StyleMatch, type MatchingResult } from '../shared/project-styles';
 import { formatMatchValue } from '../styles/numeric';
@@ -6,7 +7,7 @@ import type { StylesClient } from '../styles/client';
 const emptySnapshot = (): ProjectSnapshot => ({ files: [], classes: 0, variables: 0, rules: 0, warnings: [] });
 const validTokens = (tokens: string[]): boolean => tokens.length > 0 && tokens.every(token => token.length > 0 && !/[\s\u0000-\u001f\u007f]/u.test(token));
 
-export function installProjectStyles(root: HTMLElement, client: StylesClient, send: (message: UIMessage) => void): {
+export function installProjectStyles(root: HTMLElement, client: StylesClient, send: (message: UIMessage) => void, onUseBlockClass?: (className: string, rootId: string) => boolean): {
   setSelection(node?: InspectorNode): void;
   restoreProfile(profile: StylesProfile): void;
 } {
@@ -139,6 +140,17 @@ export function installProjectStyles(root: HTMLElement, client: StylesClient, se
     details.append(make('summary', '', `${match.selector} · ${match.confidence} confidence · ${match.category} · score ${Number(match.score.toFixed(3))}`));
     const copyable = (match.copyable ?? match.category === 'safe') && validTokens(match.classes);
     details.append(copyControl('Copy class', match.classes.join(' '), copyable, version));
+    if (onUseBlockClass) {
+      const useBlock = button('Use as block class', () => {
+        if (generation !== version || !selected || useBlock.disabled) return;
+        status.textContent = onUseBlockClass(match.classes[0]!, selected.id)
+          ? 'Block class selected for the tree draft. This reuses the name only; inspect the subtree and review CSS conflicts.'
+          : 'Select the same Figma root first.';
+      });
+      useBlock.disabled = !copyable || match.classes.length !== 1 || !validBlockClass(match.classes[0]!);
+      useBlock.title = 'Explicitly reuse one simple BEM-compatible root class name. DOM applicability is not confirmed.';
+      details.append(useBlock);
+    }
     details.append(copyControl('Copy matched CSS', match.matchedCSS ?? '', Boolean(match.matchedCSS), version));
     const selectedOverride = make('div', 'project-candidate-override');
     const choose = button('Use for override', () => {

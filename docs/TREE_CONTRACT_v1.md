@@ -1,6 +1,6 @@
 # Tree MVP A — контракт schemaVersion 1
 
-Дата: 24 ноября 2026. Контракт реализован в src/shared/tree.ts и проверен tests/tree-contract.test.ts с синтетическими fixtures в tests/fixtures/tree/minimal.ts. Это подготовка v0.7.0, не выпущенная runtime-функция. Адаптер обхода реализован в src/adapter/tree.ts, main state machine и host handlers подключены; UI дерева пока отсутствует. PluginMessage/UIMessage включают отдельные tree-unions, а InspectorState.ready и InspectorNode не меняются.
+Дата: 24 ноября 2026. Контракт реализован в src/shared/tree.ts и проверен tests/tree-contract.test.ts с синтетическими fixtures в tests/fixtures/tree/minimal.ts. Это подготовка v0.7.0, не выпущенная runtime-функция. Адаптер обхода реализован в src/adapter/tree.ts, main state machine, host handlers и UI дерева подключены; v0.7.0 остаётся preview до review/ручных gates. PluginMessage/UIMessage включают отдельные tree-unions, а InspectorState.ready и InspectorNode не меняются.
 
 ## Данные
 
@@ -58,7 +58,7 @@ JSON preflight итеративен и ограничен работой/стр�
 
 Проведён отдельный статический проход самопроверки схемы и тестов; независимый review другим исполнителем не выполнялся и остаётся обязательством будущей интеграции. Figma runtime, реальный обход 1000 узлов, responsive UI, отмена/таймауты в хосте и сохранённая baseline-матрица — not performed.
 
-Adapter-подшаг завершён 24 ноября 2026: src/adapter/tree.ts и tests/tree-adapter.test.ts — итеративный bounded read-only snapshot с normalizeNode, placeholders, hidden policy, корректной parent-local геометрией, chunk/progress/cancel hooks. Host revision/cancellation integration в main с tests/tree-main.test.ts завершена следующим подшагом 24 ноября 2026; UI дерева остаётся впереди. UI дерева и завершение milestone требуют отдельной интеграции/review/ручной проверки, не следуют из одного наличия этого контракта.
+Adapter-подшаг завершён 24 ноября 2026: src/adapter/tree.ts и tests/tree-adapter.test.ts — итеративный bounded read-only snapshot с normalizeNode, placeholders, hidden policy, корректной parent-local геометрией, chunk/progress/cancel hooks. Host revision/cancellation integration в main с tests/tree-main.test.ts завершена следующим подшагом 24 ноября 2026; UI дерева остаётся впереди. UI дерева подключён отдельным подшагом ниже; завершение milestone всё ещё требует независимого review/ручной проверки и не следует из одного наличия кода.
 
 
 ## Реализованный adapter-подшаг — 24 ноября 2026
@@ -79,7 +79,7 @@ Parent-local математика выделена в переиспользуе
 
 Проверки этого подшага: PASS — typecheck; 262 теста / 20 файлов (29 adapter cases и 1 contract case добавлены к 232); production build; git diff --check. Проверены очень широкие/глубокие деревья, hidden/locked, Group/Boolean/Instance, mask/vector, unavailable getters, mixed/пустой Unicode text, parent-axis transforms/reflection/skew, singular/nonfinite matrices, все budgets, progress/cancel/stale, scheduler errors и отсутствие мутаций. Это mocks и unit-тесты, не подтверждение реального Figma runtime/performance.
 
-Самопроверка интеграции и регрессий выполнена; независимое review другим исполнителем не выполнялось и остаётся gate перед завершением Tree MVP A. В интерфейсе изменений пока нет. Main host state machine завершена следующим подшагом ниже; следующая ограниченная задача — UI дерева.
+Самопроверка интеграции и регрессий выполнена; независимое review другим исполнителем не выполнялось и остаётся gate перед завершением Tree MVP A. В интерфейсе изменений пока нет. Main host state machine завершена следующим подшагом ниже; UI подключён следующим подшагом ниже; следующий gate — независимый review и ручная матрица.
 
 
 ## Реализованный host-подшаг — 24 ноября 2026
@@ -98,4 +98,55 @@ Main дополнительно сверяет живую page/selection пер�
 
 Проверки: 24 ноября 2026 PASS — npm run typecheck; npm test (283 теста, 21 файл; +21 host case к прежним 262); npm run build; git diff --check; manifest по-прежнему запрещает сеть. Размер code.js 200787 байт, ui.html 225901 байт. Host-тесты покрывают start/progress/ready, отмену до/после запуска, replaced/replay/stale identities, document event storm, ready→stale, page listener rebinding, Refresh, selection/page changes без события, malformed/getter payload, adapter errors/invalid snapshots, progress rollback, close и один main→настоящий adapter flow.
 
-Самопроверка выполнена. Независимое review другим исполнителем, Figma Desktop/runtime, performance/latency на реальном документе и ручная baseline-матрица — not performed. UI дерева ещё не добавлен: Inspect subtree/cancel/progress/stale/локальная активная строка — следующий подшаг; старый UI tree-ответы пока не отображает. Этап v0.7.0 остаётся открыт.
+Самопроверка выполнена. Независимое review другим исполнителем, Figma Desktop/runtime, performance/latency на реальном документе и ручная baseline-матрица — not performed. UI дерева подключён следующим подшагом ниже: Inspect subtree/cancel/progress/stale/локальная активная строка доступны как preview. Этап v0.7.0 остаётся открыт.
+
+
+## Реализованный UI-подшаг — 24 ноября 2026
+
+src/ui/tree.ts — самостоятельный контроллер секции Tree · preview, устанавливаемый один раз из index.ts. Секция доступна между CSS и Project Styles, включая empty/multiple selection, когда Inspect subtree отключён. Native details не пересоздаётся при обновлениях; дерево/опция Include hidden — session-local и не добавлены в прежний SectionState/clientStorage. Существующие Properties, Spacing, Copy Text/CSS и Project Styles остаются отдельными контроллерами Figma selection.
+
+Inspect subtree отправляет явный запрос с монотонным requestId, rootId и Include hidden. Контроллер валидирует сообщения и schema, связывает request/session/revision/root, принимает progress/ready только после started, отбрасывает старые/чужие/повторные/обратные ответы и неверную hidden policy/финальный count. Некоррелированный ответ не меняет UI. Error до started разрешён только для текущего запроса и новой допустимой identity. Started фиксирует session; смена host session в середине UI-сеанса не принимается за продолжение старой операции.
+
+Cancel завершает локальное ожидание немедленно. Если identity ещё неизвестна, первый поздний started используется только для точного tree-cancel; progress/ready больше не открывают отменённый результат. UI-watchdog равен 15s (= host timeout + 5s запаса) и тоже отзывает операцию/пытается отменить host. Pending операции после смены selection/options становятся локально stale; новый запрос запускается только явно. Inspector-state для того же root не сбрасывает фокус преждевременно: изменение потомка/предка обрабатывается авторитетным tree-stale от main. Смена root, loading/empty/multiple/error, includeHidden или tree-stale очищает snapshot и сведения, чтобы не показывать старое дерево как актуальное.
+
+UI показывает число захваченных узлов, complete/partial, прогресс с явной подписью budget (не обещание общего числа узлов), явные placeholders и diagnostics. Дерево плоское по DOM, с aria-level/posinset/setsize/expanded/selected, roving tabindex и стрелочной навигацией. Глубина визуального отступа ограничена 6 уровнями (54px), настоящая aria-level сохраняется до 65. Длинное имя имеет ellipsis/tooltip; выбранное имя и причины доступны полностью в панели. Ссылка диагностики раскрывает ancestor path и фокусирует соответствующую строку. Мышью стрелка раскрывает ветку; double-click строки также переключает её. Enter/Space выбирают строку без изменения выделения Figma.
+
+Локальная строка показывает доступные InspectorNode поля, branch/visibility/lock/parent/id, warnings, исходный текст и раскрываемый single-node CSS через прежний generateCSS. Это не CSS-экспорт дерева и не замена общего Copy CSS выбранного в Figma узла. Все design data проходят через textContent. HTML/экспорт, семантические/layout решения, новые сетевые вызовы, DOM injection и новые зависимости не добавлялись.
+
+Рендер ограничен валидированными 1000 узлами и 2000 diagnostics; изначально раскрыт только root. Раскрытие не читает Figma API. Virtualization не вводилась без замеров. Блок дерева имеет внутреннюю вертикальную прокрутку, имена/типы могут сокращаться; детали/текст переносятся, CSS имеет собственный горизонтальный scroll. Static CSS-тесты подтверждают ограничения min-width/overflow/ellipsis, но не заменяют реальный layout/contrast/screenreader тест. Локальный Chromium/browser harness недоступен; проверка 320×300 в настоящем браузере/Figma не выполнена.
+
+Проверки: 24 ноября 2026 PASS — typecheck; 303 теста в 22 файлах (+19 tree UI cases и +1 index relay case к 283); production build; git diff --check. Build: code.js 200787 байт, ui.html 244643 байт; Tree controls/JS/CSS inline, manifest networkAccess=[none]. Проверены keyboard/roving focus, раскрытие/diagnostic links, строки/Unicode без HTML, placeholders/partial, default/hidden policy, cancel до/после started, timeout/error, detached handlers, stale/replayed identities, same-root invalidation, лимит DOM, capped indentation и сохранение обычного CSS при relay дерева.
+
+Самопроверка кода и автоматических регрессий выполнена. Независимое review другим исполнителем и ручные Figma/Desktop/performance/a11y проверки не выполнялись. UI-подзадача завершена, milestone v0.7.0 не закрыт. Следующий конкретный шаг — review интеграции и прохождение ручной матрицы ниже с фактическими результатами, а не переход к HTML v0.7.1.
+
+### Ручная приёмка Tree MVP A — not performed
+
+- Перезапустить собранный плагин, выбрать Frame с вложенными Frame/Text/Rectangle, нажать Inspect subtree. Сверить source order/count и данные выбранной локальной строки; canvas selection и Properties/Spacing/Copy CSS должны остаться на исходном root.
+- Проверить collapse/expand, Tab, ↑/↓/←/→/Home/End/Enter/Space, ссылку диагностики на глубокий узел, tooltip и длинный/Unicode Text. Проверить фокус и скринридер в реальном Figma.
+- Проверить Include hidden выключенный/включённый новым запросом, locked, Group в повёрнутом parent, Boolean/Instance и mask/vector placeholders. Partial не должен выглядеть как полный экспорт.
+- На большом root отменить запрос, сразу запустить новый, быстро сменить root/страницу и редактировать потомка/внешний предок. Не должны появляться поздние ready/прогресс и stale данные; автоматического бесконечного recapture нет.
+- Проверить 320×300, 699/700 и широкое окно, обе темы/контраст, доступность нижнего контента прокруткой и resize handle, исходные Copy Text/CSS/Properties/Spacing/Styles.
+- Измерить реальный capture/render, отмену между chunks и размер сообщения на 1000 простых узлах/глубоких ветках; зафиксировать Figma version/hardware и результат. Отсутствие зависания/10s budget пока не подтверждено в хосте.
+
+
+## Owner-directed useful structure slice — 24 ноября 2026
+
+После просмотра Tree preview владелец уточнил полезный результат: копируемый HTML, теги, базовый класс и BEM-like children, по возможности использование существующего root CSS-класса. Поэтому отдельным явно запрошенным вертикальным срезом добавлен draft экспорт до завершения ручных Tree gates. Это изменение приоритета, не заявление о закрытии v0.7.0/v0.7.1 или реализации полной v0.9.1 Styles integration. Ownership зафиксирован в AGENTS.md до создания модулей.
+
+src/shared/export.ts задаёт ExportOptions/StructurePlan/ExportDraft. src/structure/plan.ts строит плоский план с source id/parent/children mapping, тегом, className, оригинальным text, placeholders/excludedIds и diagnostics. Snapshot валидируется прежним контрактом; API/DOM недоступны чистому планировщику/serializer. Решения тегов/элементов ограничены текущими node IDs и сбрасываются на новом snapshot; введённые данные не меняют исходный snapshot.
+
+Tag defaults: контейнер div, TEXT p; внутри явно выбранного phrasing-контекста — span. Heading/interactive semantics не выводятся из имени, размера или цвета. Ручные теги ограничены div/span/p/section/article/header/footer/nav/main/h1…h6/button. Button получает type=button, вложенные button и block children в phrasing-контексте блокируют вывод. Других атрибутов/URL/событий нет.
+
+Root class — один ASCII CSS identifier без точки, до 80 символов. Children используют один namespace block__element, не накопление __ по глубине; element name по нормализованному латинскому имени слоя или type fallback, с ручной заменой до 48 символов и детерминированным suffix для коллизий. Нелатинские имена не переводятся эвристикой. Stable mapping гарантирован для одинакового snapshot/options, а не при произвольной вставке новых братьев между разными revisions.
+
+src/export/serialize.ts выдаёт только строки HTML/CSS. HTML экранирует source text, сохраняет пробелы/Unicode/переносы без синтетического indentation внутри TEXT; непредставимый Unicode/NUL блокирует HTML. CSS использует generateDeclarations для каждого отображаемого узла, scoped selectors .block .block__element и явные structural resets (margin0, pre-wrap, inline-block для span, browser defaults для manual button). Flex берётся только из известного нормализованного Auto Layout; parent-relative transforms/позиции не превращаются в угаданный absolute CSS. Масштаб/поворот/скошенность отмечаются как unsupported для экспорта, не применяются скрытно.
+
+Masks/vectors/unavailable/hidden превращаются в явные static comments, excluded source IDs учитываются отдельно; descendant subtree исключённого узла не теряется молча. Truncated captured prefix сохраняет явный marker. Это partial/draft с предупреждениями, не готовое восстановление дизайна. Структурированные diagnostics включают source warnings/layout uncertainty/exclusions. HTML/CSS после escaping ограничены 2 MiB суммарно; при превышении output очищается целиком и copy отключается.
+
+src/ui/tree-export.ts — persistent controller внутри Tree, с Block class, выбранными Tag/BEM element, preview, Copy HTML draft / Copy CSS draft и clipboard fallback/errors. Изменение input немедленно отключает старые copy, пересчёт debounced 120ms. Copy привязан к версии draft; stale clipboard completion не сообщает успех для новых данных. Нет inject HTML/CSS, backend, сетевых запросов, авторизации, file writes или новых dependencies.
+
+Project Styles получил optional callback/action Use as block class. Доступен только один copyable BEM-compatible root token; сложные селекторы/комбинации/utility punctuation не подставляются как блок. Корреляция по generation и выбранному root защищает от stale callbacks. Для conditional простого кандидата разрешён явный выбор **имени**, с предупреждением, что DOM/cascade не подтверждены. Назначение классов всем детям, подавление generated declarations, resolved imported CSS или минимальные subtree overrides не реализованы. Старое Use for override/Copy CSS не менялось.
+
+Проверки: PASS typecheck, 332 теста в 25 файлах (+13 structure, +8 export, +7 export UI, +1 Project Styles root action к предыдущим 303), production build, git diff --check. code.js 200787 байт; ui.html 257328 байт; manifest networkAccess=[none]. Самопроверка и регрессии выполнены. Figma runtime/clipboard, реальная browser rendering с проектными шрифтами, min-size/focus/contrast, performance на реальном документе и независимое review другим исполнителем — not performed. Исходные UI gates Tree MVP A не закрыты, functional release version не повышена.
+
+Следующий конкретный шаг — ручная оценка полезности на блоке Egispro и review serializer/content model/границ CSS draft. После подтверждения можно отдельно согласовать per-node class matching/bindings с известным контекстом; текущее root name действие не является реализацией этой будущей функции.
