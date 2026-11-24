@@ -1,3 +1,4 @@
+import type { TreeUIMessage, TreePluginMessage } from './tree';
 import type { SpacingResult } from './spacing';
 import type { SectionState } from './sections';
 import type { StylesProfile, StylesRequest, StylesReply } from './project-styles';
@@ -39,12 +40,12 @@ export type InspectorState =
   | { status: 'multiple'; count: number }
   | { status: 'error'; message: string }
   | { status: 'ready'; node: InspectorNode; css: string };
-export type PluginMessage = { type: 'inspector-state'; state: InspectorState }
+export type PluginMessage = TreePluginMessage | { type: 'inspector-state'; state: InspectorState }
   | { type: 'resize-error'; message: string }
   | { type: 'section-state'; sections: SectionState }
   | { type: 'styles-reply'; reply: StylesReply }
   | { type: 'styles-profile'; profile: StylesProfile };
-export type UIMessage = { type: 'ready' } | { type: 'refresh' }
+export type UIMessage = TreeUIMessage | { type: 'ready' } | { type: 'refresh' }
   | { type: 'resize'; width: number; height: number; finished: boolean }
   | { type: 'window-bounds'; availableWidth: number; availableHeight: number }
   | { type: 'sections-ready' }

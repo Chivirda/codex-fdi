@@ -1,3 +1,5 @@
+import { captureTree, type CaptureTreeResult } from './adapter/tree';
+import { parseTreeUIMessage, parseTreePluginMessage, sameTreeIdentity, TREE_LIMITS, type TreeIdentity, type TreePluginMessage } from './shared/tree';
 import { normalizeNode } from './adapter/normalize';
 import { inspectSpacing } from './adapter/spacing';
 import { generateCSS } from './css/generate';
@@ -88,8 +90,121 @@ function inspect(): void {
   }
 }
 
+// Tree transport is independent of the existing inspector and never recaptures
+// automatically on edits. Main owns revision and lifecycle; adapter owns API data.
+type TreePhase = 'running' | 'ready' | 'cancelled' | 'stale' | 'error';
+type StaleReason = Extract<TreePluginMessage, { type: 'tree-stale' }>['reason'];
+interface TreeOperation { identity: TreeIdentity; pageId: string; phase: TreePhase; progress: number }
+const documentSessionId = `tree-${Date.now().toString(36)}-${Math.random().toString(36).slice(2)}`;
+let treeRevision = 0;
+let lastTreeRequestId = -1;
+let activeTree: TreeOperation | undefined;
+let pendingTreeStale: Extract<TreePluginMessage, { type: 'tree-stale' }> | undefined;
+let treeStaleTimer: ReturnType<typeof setTimeout> | undefined;
+function postTree(message: TreePluginMessage): boolean {
+  if (!parseTreePluginMessage(message)) return false;
+  try { figma.ui.postMessage(message satisfies PluginMessage); return true; } catch { return false; }
+}
+function flushTreeInvalidation(): void {
+  clearTimeout(treeStaleTimer); treeStaleTimer = undefined;
+  const message = pendingTreeStale; pendingTreeStale = undefined;
+  if (message) postTree(message);
+}
+function invalidateTree(reason: StaleReason, coalesce = false): void {
+  // Revoke synchronously, even if UI notification is coalesced. An async result
+  // must never become ready in the gap before the queued stale notification.
+  treeRevision++;
+  if (activeTree && (activeTree.phase === 'running' || activeTree.phase === 'ready')) {
+    activeTree.phase = 'stale';
+    pendingTreeStale = { type: 'tree-stale', ...activeTree.identity, reason };
+  }
+  if (!coalesce) flushTreeInvalidation();
+  else if (pendingTreeStale && treeStaleTimer === undefined) treeStaleTimer = setTimeout(flushTreeInvalidation, 0);
+}
+function treeStaleReason(operation: TreeOperation): StaleReason | undefined {
+  if (activeTree !== operation) return 'replaced';
+  try {
+    if (figma.currentPage.id !== operation.pageId) return 'page';
+    const selection = figma.currentPage.selection;
+    if (selection.length !== 1 || selection[0]?.id !== operation.identity.rootId) return 'selection';
+  } catch { return 'document'; }
+  if (operation.phase === 'stale' || operation.identity.revision !== treeRevision) return 'document';
+  return undefined;
+}
+function runningTree(operation: TreeOperation): boolean {
+  if (activeTree !== operation || operation.phase !== 'running') return false;
+  const reason = treeStaleReason(operation);
+  if (reason) { invalidateTree(reason); return false; }
+  return true;
+}
+function finishTree(operation: TreeOperation, result: CaptureTreeResult): void {
+  if (!runningTree(operation)) return;
+  if (result.status === 'stale') { invalidateTree('document'); return; }
+  if (result.status === 'cancelled') {
+    operation.phase = 'cancelled'; postTree({ type: 'tree-cancelled', ...operation.identity }); return;
+  }
+  if (result.status === 'ready') {
+    const message = { type: 'tree-ready', ...operation.identity, snapshot: result.snapshot } as const;
+    if (parseTreePluginMessage(message) && result.snapshot.sourceOrder.length >= operation.progress) {
+      operation.phase = 'ready'; postTree(message); return;
+    }
+  }
+  operation.phase = 'error';
+  const message = result.status === 'error' ? result.message : 'Tree adapter returned an invalid or mismatched snapshot.';
+  if (!postTree({ type: 'tree-error', ...operation.identity, message })) {
+    postTree({ type: 'tree-error', ...operation.identity, message: 'Tree capture failed.' });
+  }
+}
+function handleTreeMessage(value: unknown): void {
+  const message = parseTreeUIMessage(value);
+  if (!message) return;
+  // A queued notification for a previous revision precedes any new command.
+  flushTreeInvalidation();
+  if (message.type === 'tree-cancel') {
+    if (activeTree?.phase === 'running' && sameTreeIdentity(activeTree.identity, message)) {
+      activeTree.phase = 'cancelled'; postTree({ type: 'tree-cancelled', ...activeTree.identity });
+    }
+    return;
+  }
+  // IDs are monotonic for this UI/plugin session. Replays cannot replace work.
+  if (message.requestId <= lastTreeRequestId) return;
+  lastTreeRequestId = message.requestId;
+  invalidateTree('replaced');
+  const identity: TreeIdentity = { requestId: message.requestId, documentSessionId, revision: treeRevision, rootId: message.rootId };
+  try {
+    const page = figma.currentPage, selection = page.selection;
+    if (selection.length !== 1 || selection[0]?.id !== message.rootId) {
+      postTree({ type: 'tree-error', ...identity, message: 'Select exactly one matching root on the current page.' }); return;
+    }
+    const root = selection[0];
+    const operation: TreeOperation = { identity, pageId: page.id, phase: 'running', progress: -1 };
+    activeTree = operation;
+    if (!postTree({ type: 'tree-started', ...identity })) { operation.phase = 'error'; return; }
+    // Defer the first chunk so immediate cancellation/replacement can prevent reads.
+    void Promise.resolve().then(() => {
+      if (!runningTree(operation)) return undefined;
+      return captureTree(root, {
+        identity, includeHidden: message.includeHidden,
+        isStale: () => treeStaleReason(operation) !== undefined,
+        isCancelled: () => operation.phase === 'cancelled',
+        onProgress: processedNodes => {
+          if (!runningTree(operation) || !Number.isSafeInteger(processedNodes) || processedNodes < 0
+            || processedNodes > TREE_LIMITS.maxNodes || processedNodes <= operation.progress) return;
+          if (postTree({ type: 'tree-progress', ...identity, processedNodes })) operation.progress = processedNodes;
+        },
+      });
+    }).then(result => { if (result) finishTree(operation, result); }).catch(() => {
+      finishTree(operation, { status: 'error', message: 'Tree capture failed. Refresh the selection and try again.' });
+    });
+  } catch { postTree({ type: 'tree-error', ...identity, message: 'Current page or selection is unavailable.' }); }
+}
+
 figma.ui.onmessage = (message: unknown) => {
   if (!message || typeof message !== 'object' || !('type' in message)) return;
+  const transportType: unknown = Object.getOwnPropertyDescriptor(message, 'type')?.value;
+  if (typeof transportType !== 'string') return;
+  if (transportType === 'tree-inspect' || transportType === 'tree-cancel') { handleTreeMessage(message); return; }
+  if (message.type === 'refresh') invalidateTree('refresh');
   if (message.type === 'ready' || message.type === 'refresh') inspect();
   if (message.type === 'styles-profile-ready') {
     void stylesProfileLoaded.then(() => figma.ui.postMessage({ type: 'styles-profile', profile: stylesProfile } satisfies PluginMessage));
@@ -156,13 +271,20 @@ figma.ui.onmessage = (message: unknown) => {
     else saveTimer = setTimeout(() => saveWindowSize(size), 400);
   }
 };
-figma.on('selectionchange', inspect);
+figma.on('selectionchange', () => { invalidateTree('selection', true); inspect(); });
 let observedPage = figma.currentPage;
-observedPage.on('nodechange', inspect);
+const pageChanged = (): void => { invalidateTree('document', true); inspect(); };
+observedPage.on('nodechange', pageChanged);
 figma.on('currentpagechange', () => {
-  observedPage.off('nodechange', inspect);
+  invalidateTree('page', true);
+  observedPage.off('nodechange', pageChanged);
   observedPage = figma.currentPage;
-  observedPage.on('nodechange', inspect);
+  observedPage.on('nodechange', pageChanged);
   inspect();
+});
+figma.on('close', () => {
+  clearTimeout(treeStaleTimer); treeStaleTimer = undefined; pendingTreeStale = undefined;
+  if (activeTree) activeTree.phase = 'cancelled';
+  activeTree = undefined;
 });
 inspect();
