@@ -1,18 +1,18 @@
 # Design Inspector — ROADMAP v0.6.1 → 1.0+
 
-Статус: проектный план, не описание уже реализованных возможностей. Дата сверки: 23 ноября 2026. Базовая продуктовая версия: v0.6.1 по README и заданию владельца. В package.json сейчас 0.1.0; синхронизация номера — отдельная будущая задача, в рамках этого документа файлы конфигурации не меняются.
+Статус: проектный план, не описание уже реализованных возможностей. Дата последней сверки: 24 ноября 2026. Базовая продуктовая версия: v0.6.1 по README и заданию владельца. В package.json сейчас 0.1.0; политика версий закреплена в AGENTS.md: baseline не меняет номер пакета, синхронизация package.json/package-lock.json выполняется при принятом функциональном релизе.
 
 ## Текущий шаг
 
 Обновлено: 24 ноября 2026. Источник текущего статуса — этот блок; раздел 14 описывает исходную точку плана.
 
-- **Текущая продуктовая версия:** v0.6.1.
-- **Статус реализации roadmap:** ещё не начата; подготовка плана и указателей завершена, этап baseline не выполнен.
-- **Текущий этап / следующий к выполнению:** v0.6.2 — baseline.
-- **Текущая задача:** не начата. Сверить базовое поведение v0.6.1, согласовать ownership новых модулей и политику версии, выполнить проверки baseline по разделам 10–11.
-- **Следующее действие:** начать baseline со сверки README, контрактов и регрессионного checklist; после закрытия baseline перейти к контракту Tree MVP A (v0.7.0).
-- **Последняя завершённая задача:** подготовлены ROADMAP.md и правила ведения указателей; реализация и runtime-проверки не выполнялись.
-- **Незакрытые проверки:** typecheck, test, build и ручная матрица baseline ещё не выполнялись в рамках roadmap; их результат неизвестен.
+- **Текущая продуктовая версия:** v0.6.1; checkpoint v0.6.2 baseline закрыт без изменения runtime-функциональности и package version.
+- **Статус реализации roadmap:** v0.6.2 завершён по gate раздела 10; Tree MVP A ещё не начат.
+- **Текущий этап / следующий к выполнению:** v0.7.0 — Tree MVP A, сначала отдельная задача контракта.
+- **Текущая задача:** baseline завершён 24 ноября 2026. README/contracts сверены, правила ownership новых путей и version policy закреплены в AGENTS.md, регрессионная матрица записана в [отчёте baseline](docs/BASELINE_v0.6.2.md). Исходный HEAD сверки — ece46e6.
+- **Следующее действие:** взять задачу shared/tree.ts: schema и типы, request/revision/cancel/stale, полнота веток, hidden policy, начальные bounded limits и runtime-валидация; зафиксировать контракт до реализации adapter/UI. На этом шаге дерево и HTML не реализованы.
+- **Последняя завершённая задача:** baseline v0.6.2. PASS: npm run typecheck; npm test — 210 тестов в 18 файлах; npm run build; проверка manifest и inline UI. Размеры: code.js 185207 байт, ui.html 225901 байт. Поведение Copy/Spacing/Styles не менялось; исправлены описания conditional Copy class/No override needed в README.
+- **Незакрытые проверки:** ручная матрица Figma Desktop — not performed (selection, Copy/clipboard, Spacing, resize/320×300/699/700, темы/a11y, restart/storage, Styles import/matching, Worker/CSP fallback). Самопроверка документации выполнена; независимое review другим исполнителем не выполнялось, gate review будущей runtime-интеграции сохраняется. Производительность дерева пока не проверялась: реализации нет. Подробности и переносимые проверки — в отчёте baseline.
 
 После каждой завершённой задачи обновлять этот блок: фактический результат, оставшиеся проверки, текущую/следующую задачу и дату. Этап завершать только после выполнения всех его критериев приёмки. Если задача завершена частично, явно указать остаток; не продвигать этап автоматически. Подробное правило — в AGENTS.md, раздел Roadmap tracking.
 
@@ -26,7 +26,7 @@
 
 ## 2. Что существует сейчас
 
-Сверены AGENTS.md, README.md, package.json, manifest.json, docs/STYLE_MATCHING_DIAGNOSTICS.md, структура src/tests, src/main.ts, src/shared/contracts.ts, src/adapter/normalize.ts и src/css/generate.ts. Это статическая сверка; проверки в Figma и запуск тестов при подготовке документа не выполнялись.
+Сверены AGENTS.md, README.md, package.json, manifest.json, docs/STYLE_MATCHING_DIAGNOSTICS.md, структура src/tests, src/main.ts, src/shared/contracts.ts, src/adapter/normalize.ts и src/css/generate.ts. Первоначальная сверка плана была статической. 24 ноября 2026 выполнен baseline с typecheck/test/build; текущие доказательства и невыполненные проверки приведены в блоке «Текущий шаг» и отчёте baseline. Проверки Figma Desktop в этом этапе не выполнялись.
 
 | Область | Реальное состояние v0.6.1 | Следствие для плана |
 |---|---|---|
@@ -57,7 +57,7 @@
 | QA Agent | geometry/spacing-adapter/units tests, независимый review | Матрица дерева, golden fixtures, проверки HTML/layout; новые пути предварительно закрепляет Lead |
 | Tech Lead по Project Styles | shared/project-styles.ts, интеграция; существующие parser/normalize/index/match/session/worker/client/profile | Связь классов с узлами через существующий движок; расширение ownership фиксировать до кода |
 
-Новые чистые области src/structure/** (HTML/семантика), src/layout/** (решения layout) и src/export/** (сборка результата) пока не имеют владельцев в AGENTS.md. До их создания Lead должен явно закрепить их за исполнителями в отдельном изменении правил; этот документ сам по себе ownership не меняет. Ни UI, ни CSS/geometry/structure/layout не импортируют Figma API и не получают SceneNode.
+На baseline новые чистые области src/structure/** (HTML/семантика), src/layout/** (решения layout) и src/export/** (сборка результата), будущие tree-пути и тесты закреплены в AGENTS.md. Чистые новые области зарезервированы за Tech Lead; делегирование требует явного изменения ownership. Это назначение не разрешает реализацию всех этапов сразу. Ни UI, ни CSS/geometry/structure/layout не импортируют Figma API и не получают SceneNode.
 
 Поток: Figma → adapter snapshot → JSON-контракт → чистый анализ структуры/layout → пользовательские решения → проверенный export plan → HTML serializer + CSS engine → текст/локальный файл. Main владеет событиями и транспортом. UI отображает данные и отправляет команды, не вычисляет собственные CSS-значения.
 
@@ -207,7 +207,7 @@ Blocker запрещает «готовый экспорт», но позвол�
 
 | Этап | Фичи и результат | Зависит от | Критерии приёмки / gate |
 |---|---|---|---|
-| v0.6.2 — baseline | Зафиксировать поведение v0.6.1, согласовать version policy, regression checklist и ownership новых путей | Текущий код | Сверены README/contracts; typecheck/test/build проходят; ручные проверки помечены performed/not performed; нет изменения поведения Copy/Spacing/Styles |
+| v0.6.2 — baseline (gate выполнен 24.11.2026) | Зафиксировать поведение v0.6.1, согласовать version policy, regression checklist и ownership новых путей | Текущий код | Сверены README/contracts; typecheck/test/build проходят; ручные проверки помечены performed/not performed; нет изменения поведения Copy/Spacing/Styles |
 | v0.7.0 — Tree MVP A | Отдельный bounded snapshot, дерево просмотра, progress/cancel/stale, placeholders и warnings; без HTML | v0.6.2, shared tree contract | Все включённые потомки представлены или имеют явную причину пропуска; смена selection не показывает старый ответ; hidden/limits проверены; UI 320×300 остаётся доступен |
 | v0.7.1 — Tree MVP B | StructurePlan, безопасные div/p/span, HTML fragment, явный простой Auto Layout, fixed px, ручные теги | v0.7.0, ownership structure/export | Валидный экранированный HTML и scoped CSS для вложенных Frame/Text/solid Rectangle; никакого автоматического grid/absolute guessing; неподдерживаемое видно |
 | v0.8.0 — Flow MVP | Sizing fixed/hug/fill для поддержанных случаев, nested flex, block, ручной overlay, решения пользователя и undo/reset | v0.7.1, resolved plan | Fixtures вложенных flex и mixed flow/overlay воспроизводят поддержанный snapshot; отсутствуют скрытые конфликты размеров и CSS; rebase overrides безопасен |
@@ -264,7 +264,7 @@ Performance gate на зафиксированной машине/runtime: 1000 
 - Imported CSS не содержит полный DOM/cascade/environment. Browser-equivalent computed style и гарантированное совпадение класса не входят в 1.0.
 - Реальный предел message size/host responsiveness должен быть измерен; предлагаемые бюджеты не объявляются лимитами Figma API.
 
-До начала v0.7 Lead решает: точные schema/types и новые ownership paths; правила partial export; лимиты после первого замера; необходимость отдельного worker анализа; политику version metadata. До v0.8: sizing mapping и конфликтные cases. До v0.9: grid API capability и tracks/spans support matrix. До RC: формат export manifest, правила semantic blockers и документированный support matrix.
+На baseline Lead закрепил ownership новых путей и политику version metadata в AGENTS.md. До начала реализации v0.7 остаются: точные schema/types; правила partial export; лимиты после первого замера; необходимость отдельного worker анализа. До v0.8: sizing mapping и конфликтные cases. До v0.9: grid API capability и tracks/spans support matrix. До RC: формат export manifest, правила semantic blockers и документированный support matrix.
 
 ## 13. После 1.0: отдельные направления
 
@@ -278,4 +278,4 @@ Performance gate на зафиксированной машине/runtime: 1000 
 
 ## 14. Порядок следующей задачи
 
-Начать с v0.6.2 и контракта Tree MVP A. Результат первой реализации — bounded read-only дерево с проверенными revisions/cancel и явными пропусками, без HTML-эвристик. Передавать исполнителю конкретный этап, разрешённые файлы, контракт, fixtures и acceptance gate. После прохождения этапа обновлять этот документ фактическим статусом и доказательствами, не помечать будущие возможности выполненными по одному наличию кода.
+Baseline v0.6.2 закрыт 24 ноября 2026 по gate раздела 10, ручная Figma-матрица явно остаётся not performed. Следующая отдельная задача — контракт Tree MVP A: shared/tree.ts, runtime-validation, request/revision/cancel/stale, branch completeness/hidden policy и bounded limits до adapter/UI. Результат первой будущей реализации — bounded read-only дерево с проверенными revisions/cancel и явными пропусками, без HTML-эвристик. Передавать исполнителю конкретный этап, разрешённые файлы, контракт, fixtures и acceptance gate. После прохождения этапа обновлять этот документ фактическим статусом и доказательствами, не помечать будущие возможности выполненными по одному наличию кода.

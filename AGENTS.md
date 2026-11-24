@@ -32,3 +32,17 @@ Run `npm run typecheck`, `npm test`, and `npm run build` before handoff. Do not 
 `ROADMAP.md`, section «Текущий шаг», is the single source of truth for the current milestone, task, next action, last completed task, and outstanding checks. Read it before starting roadmap work; mark an accepted task as in progress when work starts. The roadmap is not authorization to implement every milestone.
 
 After completing each task, and before handoff, the Tech Lead or integrating owner must update that status block in the same change: record the actual outcome and date, completed and unperformed checks, remaining work, and the next concrete action. Contributors report their outcome to the integrating owner; they do not edit documentation outside their ownership. If work is partial or blocked, record that fact and keep the milestone open. Advance the milestone only when all acceptance criteria are met; never infer completion from code presence or claim tests/Figma validation that were not performed. Keep milestone descriptions and section 14 consistent with the status block when the plan changes; do not duplicate a separate current-step pointer in AGENTS.md. Documentation updates do not authorize commits or pushes.
+
+
+## Version policy and reserved roadmap ownership
+
+Product milestones are tracked in ROADMAP.md; they are distinct from the private npm package version. v0.6.2 is a baseline checkpoint of the existing v0.6.1 behavior, not a new runtime feature release. Keep package.json/package-lock.json at 0.1.0 for this checkpoint. When a feature milestone is accepted for release, the integrating owner updates both package versions together and records the product release in README; do not change manifest.api as a product version. Experimental or partial stages must not be presented as released features.
+
+Before any future implementation, the Lead fixes the corresponding contract and acceptance scope. The following paths are reserved ownership, not authorization to implement later milestones:
+
+- Tech Lead: src/shared/tree.ts, src/shared/export.ts, src/shared/decisions.ts; src/structure/**, src/layout/**, src/export/** and their future tests (tests/structure*.test.ts, tests/layout*.test.ts, tests/export*.test.ts, tests/decisions*.test.ts); main transport integration and docs. Pure modules must not read Figma or DOM. A later explicit ownership change may delegate these paths.
+- Figma API Developer: src/adapter/tree.ts and tests/tree-adapter.test.ts. Reuse normalizeNode; no second definition of inspector dimensions or typography.
+- UI Developer: src/ui/tree.ts and tests/tree-ui.test.ts, plus existing UI ownership. Tree selection is local UI state; Figma selection and snapshot root remain distinct.
+- Tech Lead for integration/QA: tests/tree-contract.test.ts, tests/tree-main.test.ts, tests/fixtures/tree/**. Shared tree contracts, revision/cancellation and runtime message validation are fixed before traversal/UI code starts. Geometry ownership and existing module ownership remain as defined above.
+
+Tree-ready/children messages must be separate from InspectorState.ready; do not add mandatory children to InspectorNode. No HTML, layout inference, new parser or Project Sync is part of the baseline checkpoint.
